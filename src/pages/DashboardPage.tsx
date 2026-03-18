@@ -81,8 +81,7 @@ export default function DashboardPage() {
       setAiInsights(analysis);
       toast.success('Llama-3 Analysis Complete!');
     } catch (error) {
-      console.error('AI Analysis Error:', error);
-      toast.error('Failed to connect to Llama AI Server. Is it running on port 8000?');
+      toast.error('AI Connection Failed. If this is the deployed site, please check your VITE_AI_API_URL environment variable in Vercel.');
     } finally {
       setIsAnalyzing(false);
     }

@@ -45,6 +45,16 @@ const RAW_API_URL = import.meta.env.VITE_AI_API_URL || 'http://localhost:8000';
 const CLEAN_API_URL = RAW_API_URL.endsWith('/') ? RAW_API_URL.slice(0, -1) : RAW_API_URL;
 const API_BASE_URL = `${CLEAN_API_URL}/ai/query`;
 
+// Log to help user verify the URL in their browser console
+if (typeof window !== 'undefined') {
+  console.log('Tradient AI Service using:', API_BASE_URL);
+}
+
+// Only log once to help user verify the URL in their browser console
+if (typeof window !== 'undefined') {
+  console.log('Tradient AI Service using:', API_BASE_URL);
+}
+
 export const AIApiService = {
   /**
    * Safe mapping from generic CSV trade data to strict AI TradeInput
@@ -83,7 +93,10 @@ export const AIApiService = {
         payload: { trade }
       })
     });
-    if (!response.ok) throw new Error('API Error');
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`AI API Error: ${response.status} - ${errorText}`);
+    }
     return response.json();
   },
 
@@ -96,7 +109,10 @@ export const AIApiService = {
         payload: { trades: gradedTrades, question }
       })
     });
-    if (!response.ok) throw new Error('API Error');
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`AI API Analysis Error: ${response.status} - ${errorText}`);
+    }
     return response.json();
   },
 

@@ -262,7 +262,7 @@ export default function NewsSection() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ delay: index * 0.1 }}
-                    className="p-4 rounded-lg border bg-background/50 backdrop-blur-sm hover:bg-muted/30 transition-all cursor-pointer"
+                    className="p-4 rounded-lg border bg-background/50 backdrop-blur-sm transition-all"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 space-y-2">
