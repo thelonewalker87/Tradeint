@@ -1,245 +1,214 @@
-# Tradient Dashboard
+# Tradient – AI Trading Discipline Engine
 
-A comprehensive trading analytics dashboard designed to help traders track performance, analyze patterns, and improve their trading discipline through data-driven insights.
+> **Live Demo:** [https://tradeint.vercel.app/dashboard](https://tradeint.vercel.app/dashboard)
+
+Tradient is a comprehensive, AI-powered trading analytics dashboard built for active Forex traders. It helps you track performance, uncover behavioral patterns, score your discipline, and make data-driven improvements — all in one sleek interface.
+
+---
 
 ## 🚀 Features
 
-### 📊 Performance Analytics
-- **Real-time P&L Tracking** - Monitor total profit/loss, win rate, and expectancy
-- **Equity Curve Visualization** - Track account growth over time with interactive charts
-- **Risk-Reward Analysis** - Analyze average risk-reward ratios and position sizing
-- **Win/Loss Patterns** - Monthly breakdown of winning vs losing trades
+### 📊 Trading Dashboard
+- Real-time **P&L tracking** — total profit/loss, win rate, and expectancy at a glance
+- **Trade Journal Table** — paginated, searchable, filterable history of all your trades
+- **Trade Replay Modal** — review past trades with a simulated price-action chart and AI recommendations
+- Upload your own **CSV trade data** for instant analysis
 
-### 🧠 Behavioral Insights
-- **Trading Psychology Analysis** - Identify emotional trading patterns and biases
-- **Discipline Scoring** - Track adherence to trading rules and strategies
-- **Performance Heatmaps** - Visualize trading performance by time of day and day of week
-- **Behavioral Alerts** - Get notified about recurring trading mistakes
+### 📈 Advanced Analytics
+- **Equity Curve** — track account growth over time with an interactive area chart
+- **Monthly Performance** — wins vs. losses and win rate trend over time (bar + line combo)
+- **Trading Activity Heatmap** — visualize P&L performance by hour of day and day of week
+- **Symbol Performance** — pie chart + ranked table for your most/least traded pairs
+- **Long vs Short Analysis** — compare directional bias
+
+### 🧠 AI Behavioral Insights
+- Automatically detects patterns like **revenge trading**, **overtrading**, **position escalation**, and **holding losers**
+- Each insight includes affected trade count, estimated dollar impact, and an actionable recommendation
+- Severity levels: Critical / High / Medium / Low
+
+### 🎯 Discipline Score
+- Weighted score (0–100) across four pillars: **Risk Management**, **Rule Adherence**, **Emotional Control**, and **Consistency**
+- Visual breakdown with progress bars and per-category factor tags
+- Personalized improvement recommendations based on your actual trading data
+
+### 📰 News & Economic Calendar
+- Displays upcoming high-impact news events (FOMC, NFP, ECB, etc.)
+- Filterable by currency and impact level
+- Helps you correlate trade decisions with market events
 
 ### 📝 Trade Journal
-- **Comprehensive Trade Logging** - Record entry/exit points, position sizes, and outcomes
-- **Rule Violation Tracking** - Monitor breaches of your trading plan
-- **Trade Replay** - Review past trades with detailed analysis
-- **Performance Metrics** - Detailed statistics for individual trades
+- Manual trade entry with **full-featured Add Trade Modal** (4-tab form: Basic → Advanced → Psychology → Review)
+- Fields include: pair, session, direction, entry/exit, position size, R:R, setup type, emotional state, confidence level, rule violations, and notes
+- Real-time pip/result/R:R calculation as you fill in prices
 
-### 📰 Economic Calendar
-- **High-Impact News Events** - Track major economic announcements
-- **Market Impact Analysis** - See how news events affect your trading performance
-- **Currency-Specific Events** - Filter news by traded currency pairs
+### ⚙️ Settings
+- Dark / Light / System theme toggle
+- Persistent sidebar collapse state
 
-### 🎨 Modern UI/UX
-- **Dark/Light Mode** - Toggle between themes for comfortable viewing
-- **Responsive Design** - Works seamlessly on desktop, tablet, and mobile
-- **Interactive Charts** - Built with Recharts for smooth data visualization
-- **Real-time Updates** - Live data refresh with React Query
+---
 
 ## 🛠️ Technology Stack
 
-### Frontend Framework
-- **React 18** - Modern, component-based UI framework
-- **TypeScript** - Type-safe JavaScript development
-- **Vite** - Fast build tool and development server
+| Category | Technology |
+|---|---|
+| Framework | React 18 + TypeScript |
+| Build Tool | Vite |
+| Styling | Tailwind CSS + shadcn/ui |
+| UI Components | Radix UI primitives |
+| Charts | Recharts |
+| Animations | Framer Motion |
+| Icons | Lucide React |
+| State | React Query + React Hook Form |
+| Routing | React Router v6 |
+| CSV Parsing | PapaParse |
+| Deployment | Vercel |
+| Testing | Vitest + Testing Library |
 
-### UI & Styling
-- **Tailwind CSS** - Utility-first CSS framework
-- **Radix UI** - Accessible, unstyled UI components
-- **shadcn/ui** - Beautiful, customizable component library
-- **Framer Motion** - Smooth animations and transitions
-- **Lucide React** - Comprehensive icon library
+---
 
-### Data & State Management
-- **TanStack React Query** - Server state management
-- **React Hook Form** - Form state management
-- **Zod** - Schema validation
-- **React Router** - Client-side routing
-
-### Charts & Visualization
-- **Recharts** - Declarative charting library
-- **Custom Analytics** - Tailored trading-specific visualizations
-
-### Development Tools
-- **ESLint** - Code linting and formatting
-- **Vitest** - Unit testing framework
-- **Testing Library** - Component testing utilities
-- **PostCSS** - CSS processing and optimization
-
-## 📦 Installation
+## 📦 Getting Started
 
 ### Prerequisites
-- **Node.js** (v18 or higher)
-- **npm** or **yarn** package manager
+- **Node.js** v18+
+- **npm**
 
-### Quick Start
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/bhatayush684/Tradeint.git
-   cd tradient-dashboard
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Start development server**
-   ```bash
-   npm run dev
-   ```
-
-4. **Open your browser**
-   Navigate to `http://localhost:8080`
-
-## 🚀 Available Scripts
+### Installation
 
 ```bash
-# Start development server
+# Clone the repo
+git clone https://github.com/bhatayush684/Tradeint.git
+cd Tradeint
+
+# Install dependencies
+npm install
+
+# Start the dev server
 npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Run tests
-npm run test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Lint code
-npm run lint
-
-# Build for development mode
-npm run build:dev
 ```
+
+Open [http://localhost:8080](http://localhost:8080) in your browser.
+
+### Available Scripts
+
+```bash
+npm run dev          # Start development server (port 8080)
+npm run build        # Production build
+npm run preview      # Preview the production build locally
+npm run test         # Run unit tests
+npm run test:watch   # Run tests in watch mode
+npm run lint         # Lint source files
+```
+
+---
 
 ## 📁 Project Structure
 
 ```
 src/
-├── components/          # Reusable UI components
-│   ├── ui/             # Base UI components (buttons, forms, etc.)
-│   ├── DashboardLayout.tsx
-│   ├── PerformanceCards.tsx
-│   ├── PerformanceCharts.tsx
-│   ├── TradeJournalTable.tsx
-│   └── ...
-├── pages/              # Page components
-│   ├── DashboardPage.tsx
-│   ├── AnalyticsPage.tsx
-│   ├── JournalPage.tsx
-│   ├── NewsPage.tsx
+├── components/
+│   ├── ui/                    # Base shadcn/ui components
+│   ├── upload/                # CSV upload components
+│   │   └── EnhancedCSVUpload.tsx
+│   ├── charts/                # Recharts wrappers & tooltips
+│   ├── AppSidebar.tsx         # Main navigation sidebar
+│   ├── DashboardLayout.tsx    # App shell with responsive sidebar
+│   ├── TradeJournalTable.tsx  # Paginated trade history table
+│   ├── TradeReplayModal.tsx   # Per-trade replay + AI recommendation
+│   ├── BehavioralInsights.tsx # AI pattern detection widget
+│   └── DisciplineScoreWidget.tsx
+├── pages/
+│   ├── DashboardPage.tsx      # Main dashboard
+│   ├── AnalyticsPage.tsx      # Advanced analytics charts
+│   ├── JournalPage.tsx        # Full trade journal
+│   ├── NewsPage.tsx           # Economic calendar
 │   └── SettingsPage.tsx
-├── contexts/           # React contexts
-│   └── AuthContext.tsx
-├── data/               # Mock data and types
-│   └── mockData.ts
-├── hooks/              # Custom React hooks
-├── lib/                # Utility functions
-└── test/               # Test files
+├── contexts/
+│   ├── AuthContext.tsx        # Authentication state
+│   └── theme-context.tsx      # Dark/light theme
+├── lib/
+│   ├── analytics/             # Equity curve, monthly, symbol calcs
+│   ├── behavioral/            # Pattern detection algorithms
+│   └── scoring/               # Discipline score calculation
+├── data/
+│   ├── mockData.ts            # Sample trades for demo
+│   └── types.ts               # Shared TypeScript interfaces
+└── csvManager.ts              # CSV ↔ JSON localStorage manager
 ```
 
-## 🔧 Configuration
+---
 
-### Environment Variables
-Currently, the application uses mock data for demonstration. For production use, you would typically need:
+## 📤 CSV Upload Format
 
-```env
-# API Configuration
-VITE_API_BASE_URL=https://your-api-endpoint.com
-VITE_API_KEY=your-api-key
+Upload your trade history as a `.csv` file. The required column headers are:
 
-# Authentication
-VITE_AUTH_PROVIDER=auth0|firebase|custom
-VITE_AUTH_CLIENT_ID=your-client-id
+| Column | Type | Example |
+|---|---|---|
+| `id` | string | `TR-001` |
+| `date` | YYYY-MM-DD | `2025-03-15` |
+| `pair` | string | `EUR/USD` |
+| `direction` | `long` / `short` | `long` |
+| `entry` | number | `1.08567` |
+| `exit` | number | `1.08923` |
+| `positionSize` | number (lots) | `0.10` |
+| `result` | number (USD) | `35.60` |
+| `rr` | number | `1.8` |
+| `ruleViolation` | string / empty | `Late Entry` |
+| `notes` | string / empty | `Breakout trade` |
 
-# Trading Data
-VITE_TRADING_API_KEY=your-trading-api-key
-VITE_REAL_TIME_FEED_URL=wss://your-realtime-feed.com
-```
+A sample file is included at [`public/sample-trading-data.csv`](public/sample-trading-data.csv).
 
-## 🧪 Testing
-
-The project includes a comprehensive testing setup:
-
-```bash
-# Run all tests
-npm run test
-
-# Run tests in watch mode for development
-npm run test:watch
-
-# Generate coverage report
-npm run test:coverage
-```
+---
 
 ## 🚀 Deployment
 
-### Build for Production
+The app is deployed to **Vercel** with automatic deployments on every push to `main`.
+
+**Live URL:** [https://tradeint.vercel.app/dashboard](https://tradeint.vercel.app/dashboard)
+
+To deploy your own fork:
+
+1. Push to GitHub
+2. Import the repo at [vercel.com/new](https://vercel.com/new)
+3. Framework preset: **Vite**
+4. No environment variables required for the demo version
+
+---
+
+## 🧪 Testing
+
 ```bash
-npm run build
+npm run test
 ```
 
-### Deployment Options
-- **Vercel** - Recommended for React applications
-- **Netlify** - Static site hosting with CI/CD
-- **AWS Amplify** - Full-stack hosting
-- **Docker** - Containerized deployment
+Tests are written with **Vitest** and **@testing-library/react**, configured in `vitest.config.ts`.
 
-### Environment Setup
-Ensure your hosting platform supports:
-- Node.js 18+
-- Static file serving
-- Environment variables
-- SPA routing (for React Router)
+---
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Commit your changes (`git commit -m 'feat: add my feature'`)
+4. Push to the branch (`git push origin feature/my-feature`)
 5. Open a Pull Request
+
+---
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE) for details.
 
-## 🆘 Support
+---
 
-If you encounter any issues or have questions:
+## 📊 Project Status
 
-1. Check the [Issues](https://github.com/bhatayush684/Tradeint/issues) page
-2. Create a new issue with detailed information
-3. Join our community discussions
-
-## 🔮 Roadmap
-
-### Upcoming Features
-- [ ] Real-time trading data integration
-- [ ] Multiple broker API support
-- [ ] Advanced backtesting engine
-- [ ] Mobile app (React Native)
-- [ ] AI-powered trading insights
-- [ ] Social trading features
-- [ ] Custom alert system
-- [ ] Portfolio management tools
-
-### Technical Improvements
-- [ ] TypeScript strict mode
-- [ ] End-to-end testing with Playwright
-- [ ] Performance optimization
-- [ ] Offline support
-- [ ] Progressive Web App (PWA)
-
-## 📊 Current Status
-
-**Version**: 1.0.0  
-**Status**: Development/Prototype  
-**Data Source**: Mock data (demo purposes)  
-**Authentication**: Local storage (demo)  
+| Item | Status |
+|---|---|
+| Version | 1.0.0 |
+| Deployment | ✅ Live on Vercel |
+| Data Source | CSV upload + mock data |
+| Authentication | Local storage (demo) |
+| Mobile Support | ✅ Responsive |
 
 ---
 
