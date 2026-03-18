@@ -52,11 +52,15 @@ export default function EnhancedCSVUpload() {
   const [activeTab, setActiveTab] = useState('upload');
   const [dataSummary, setDataSummary] = useState<DataSummary | null>(null);
 
+  const MAX_VALIDATION_MESSAGES = 50;
+
   const validateCSVData = useCallback((data: ParsedTrade[]): ValidationResult => {
     const errors: string[] = [];
     const warnings: string[] = [];
     let isValid = true;
     let duplicates = 0;
+    let errorCount = 0;
+    let warningCount = 0;
 
     if (data.length === 0) {
       errors.push('CSV file is empty');
@@ -76,63 +80,57 @@ export default function EnhancedCSVUpload() {
       }
     });
 
-    // Validate data types and duplicates
-    data.forEach((row, index) => {
-      if (index === 0) return; // Skip header row
+    // Validate data — cap messages to avoid DOM overload
+    for (let index = 0; index < data.length; index++) {
+      const row = data[index];
+      if (index === 0) continue;
 
-      // Check for duplicate trade IDs
+      // Stop collecting messages if we've hit the cap
+      if (errorCount >= MAX_VALIDATION_MESSAGES && warningCount >= MAX_VALIDATION_MESSAGES) break;
+
       if (row.id && tradeIds.has(row.id)) {
         duplicates++;
-        warnings.push(`Row ${index}: Duplicate trade ID: ${row.id}`);
+        if (warningCount < MAX_VALIDATION_MESSAGES) {
+          warnings.push(`Row ${index}: Duplicate trade ID: ${row.id}`);
+          warningCount++;
+        }
       } else if (row.id) {
         tradeIds.add(row.id);
       }
 
-      // Validate numeric fields
-      const numericFields = ['entry', 'exit', 'positionSize', 'result', 'rr'];
-      numericFields.forEach(field => {
-        const value = row[field as keyof ParsedTrade];
-        if (value && isNaN(Number(value))) {
-          warnings.push(`Row ${index}: ${field} should be a number`);
-        }
-      });
-
-      // Validate dates
-      if (row.date && isNaN(Date.parse(row.date))) {
-        warnings.push(`Row ${index}: date is not a valid date format`);
-      }
-
-      // Validate required values
-      if (!row.id) {
+      if (!row.id && errorCount < MAX_VALIDATION_MESSAGES) {
         errors.push(`Row ${index}: Trade ID is required`);
+        errorCount++;
         isValid = false;
       }
 
-      if (!row.pair) {
+      if (!row.pair && errorCount < MAX_VALIDATION_MESSAGES) {
         errors.push(`Row ${index}: Pair is required`);
+        errorCount++;
         isValid = false;
       }
+    }
 
-      // Validate direction
-      if (row.direction && !['long', 'short'].includes(row.direction.toLowerCase())) {
-        warnings.push(`Row ${index}: Direction should be 'long' or 'short'`);
-      }
-    });
+    if (errorCount >= MAX_VALIDATION_MESSAGES) {
+      errors.push(`... and more errors (showing first ${MAX_VALIDATION_MESSAGES})`);
+    }
+    if (warningCount >= MAX_VALIDATION_MESSAGES) {
+      warnings.push(`... and more warnings (showing first ${MAX_VALIDATION_MESSAGES})`);
+    }
 
     return {
       isValid,
       errors,
       warnings,
-      rowCount: data.length - 1, // Exclude header row
+      rowCount: data.length - 1,
       duplicates
     };
   }, []);
 
-  const generateDataSummary = useCallback((data: ParsedTrade[]): DataSummary => {
-    if (data.length === 0) return null;
-
-    const trades = data.slice(1).map(row => ({
-      id: row.id || '',
+  /** Convert parsed CSV rows to typed trade objects — done once and reused */
+  const convertToTrades = useCallback((data: ParsedTrade[]): CSVTradeData[] => {
+    return data.map(row => ({
+      id: row.id || `TR-${Date.now()}`,
       date: row.date || new Date().toISOString().split('T')[0],
       pair: row.pair || '',
       direction: (row.direction || 'long') as 'long' | 'short',
@@ -144,13 +142,18 @@ export default function EnhancedCSVUpload() {
       ruleViolation: row.ruleViolation || null,
       notes: row.notes || ''
     }));
+  }, []);
+
+  const generateDataSummary = useCallback((trades: CSVTradeData[]): DataSummary | null => {
+    if (trades.length === 0) return null;
 
     const totalTrades = trades.length;
     const totalPnL = trades.reduce((sum, trade) => sum + trade.result, 0);
     const winningTrades = trades.filter(t => t.result > 0);
+    const losingTrades = trades.filter(t => t.result < 0);
     const winRate = totalTrades > 0 ? (winningTrades.length / totalTrades) * 100 : 0;
     const avgWin = winningTrades.length > 0 ? winningTrades.reduce((sum, t) => sum + t.result, 0) / winningTrades.length : 0;
-    const avgLoss = trades.length - winningTrades.length > 0 ? trades.filter(t => t.result < 0).reduce((sum, t) => sum + t.result, 0) / (trades.length - winningTrades.length) : 0;
+    const avgLoss = losingTrades.length > 0 ? losingTrades.reduce((sum, t) => sum + t.result, 0) / losingTrades.length : 0;
     
     const pairs = [...new Set(trades.map(t => t.pair))];
     const directions = [...new Set(trades.map(t => t.direction))];
@@ -215,73 +218,58 @@ export default function EnhancedCSVUpload() {
 
     try {
       const text = await file.text();
-      setUploadProgress(30);
+      setUploadProgress(20);
 
       parse(text, {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
-          setUploadProgress(60);
+          setUploadProgress(40);
           
           const data = results.data as ParsedTrade[];
           setParsedData(data);
-          setUploadProgress(80);
 
-          // Validate parsed data
-          const validation = validateCSVData(data);
-          setValidationResult(validation);
-          
-          if (validation.isValid) {
-            const summary = generateDataSummary(data);
-            setDataSummary(summary);
-          }
-          
-          setUploadProgress(100);
-
+          // Yield to UI thread before heavy validation
           setTimeout(() => {
-            setIsUploading(false);
+            setUploadProgress(60);
+
+            // Validate parsed data
+            const validation = validateCSVData(data);
+            setValidationResult(validation);
+
+            // Convert once and reuse
+            const trades = convertToTrades(data);
+            
             if (validation.isValid) {
-              const trades = data.slice(1).map(row => ({
-                id: row.id || `TR-${Date.now()}`,
-                date: row.date || new Date().toISOString().split('T')[0],
-                pair: row.pair || '',
-                direction: (row.direction || 'long') as 'long' | 'short',
-                entry: parseFloat(row.entry || '0'),
-                exit: parseFloat(row.exit || '0'),
-                positionSize: parseFloat(row.positionSize || '0'),
-                result: parseFloat(row.result || '0'),
-                rr: parseFloat(row.rr || '0'),
-                ruleViolation: row.ruleViolation || null,
-                notes: row.notes || ''
-              }));
-              
-              // Load existing trades and merge with new ones
-              const existingTrades = CSVManager.loadFromLocalStorage();
-              const mergedTrades = [...existingTrades, ...trades];
-              
-              // Save merged data to CSVManager
-              CSVManager.saveToLocalStorage(mergedTrades);
-              
-              // Trigger storage event to notify other components
-              window.dispatchEvent(new StorageEvent('storage', {
-                key: 'tradient_trades_csv',
-                newValue: localStorage.getItem('tradient_trades_csv')
-              }));
-              
-              // Also trigger custom event for same-tab updates
-              window.dispatchEvent(new CustomEvent('tradesUpdated', {
-                detail: { tradesCount: mergedTrades.length }
-              }));
-              
-              setValidationResult({
-                isValid: true,
-                errors: [],
-                warnings: [`Successfully merged ${trades.length} new trades with existing data (${existingTrades.length + trades.length} total trades)`],
-                rowCount: trades.length,
-                duplicates: 0
-              });
+              const summary = generateDataSummary(trades);
+              setDataSummary(summary);
             }
-          }, 500);
+            
+            setUploadProgress(80);
+
+            // Yield again before save
+            setTimeout(() => {
+              if (validation.isValid) {
+                // Load existing trades and merge
+                const existingTrades = CSVManager.loadFromLocalStorage();
+                const mergedTrades = [...existingTrades, ...trades];
+                
+                // Save — CSVManager dispatches the tradesUpdated event
+                CSVManager.saveToLocalStorage(mergedTrades);
+                
+                setValidationResult({
+                  isValid: true,
+                  errors: [],
+                  warnings: [`Successfully merged ${trades.length} new trades (${mergedTrades.length} total)`],
+                  rowCount: trades.length,
+                  duplicates: 0
+                });
+              }
+
+              setUploadProgress(100);
+              setIsUploading(false);
+            }, 0);
+          }, 0);
         },
         error: (error) => {
           setValidationResult({
@@ -306,7 +294,7 @@ export default function EnhancedCSVUpload() {
       setIsUploading(false);
       setUploadProgress(0);
     }
-  }, [file, validateCSVData, generateDataSummary]);
+  }, [file, validateCSVData, generateDataSummary, convertToTrades]);
 
   const resetUpload = useCallback(() => {
     setFile(null);
@@ -318,17 +306,10 @@ export default function EnhancedCSVUpload() {
   }, []);
 
   const clearUploadedData = useCallback(() => {
-    // Clear CSVManager data
     localStorage.removeItem('tradient_trades_csv');
     resetUpload();
     
-    // Trigger storage event to notify other components
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'tradient_trades_csv',
-      newValue: null
-    }));
-    
-    // Also trigger custom event for same-tab updates
+    // Single event dispatch
     window.dispatchEvent(new CustomEvent('tradesUpdated', {
       detail: { tradesCount: 0 }
     }));

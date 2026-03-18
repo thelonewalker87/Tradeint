@@ -70,29 +70,14 @@ export default function AnalyticsPage() {
     }
   }, []);
 
-  // Load trades on mount and listen for storage changes
+  // Load trades on mount and listen for updates
   useEffect(() => {
     loadTrades();
     
-    // Listen for storage changes from other tabs/components
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'tradient_trades_csv') {
-        console.log('Storage event detected, reloading trades...');
-        loadTrades();
-      }
-    };
-    
-    // Listen for custom trades updated events (same-tab updates)
-    const handleTradesUpdate = (e: CustomEvent) => {
-      console.log('Custom tradesUpdated event detected, reloading trades...');
-      loadTrades();
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
+    const handleTradesUpdate = () => loadTrades();
     window.addEventListener('tradesUpdated', handleTradesUpdate);
     
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('tradesUpdated', handleTradesUpdate);
     };
   }, [loadTrades]);
@@ -157,8 +142,8 @@ export default function AnalyticsPage() {
     let peak = 0;
     let maxDD = 0;
     
-    trades.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .forEach(trade => {
+    const sorted = [...trades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    sorted.forEach(trade => {
         runningEquity += trade.result;
         peak = Math.max(peak, runningEquity);
         maxDD = Math.max(maxDD, peak - runningEquity);
@@ -184,7 +169,7 @@ export default function AnalyticsPage() {
     let runningEquity = 0;
     let runningR = 0;
     
-    return trades
+    return [...trades]
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .map((trade, index) => {
         runningEquity += trade.result;

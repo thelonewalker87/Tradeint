@@ -13,6 +13,8 @@ export interface CSVTradeData {
 }
 
 class CSVManager {
+  private static readonly STORAGE_KEY = 'tradient_trades_csv';
+
   private static readonly CSV_HEADERS = [
     'id',
     'date', 
@@ -100,34 +102,45 @@ class CSVManager {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     }
   }
 
+  /**
+   * Save trades as JSON to localStorage — much faster than CSV serialization
+   * for structured data. CSV conversion is only used for export/download.
+   */
   static saveToLocalStorage(trades: CSVTradeData[]): void {
     try {
-      const csvContent = this.convertToCSV(trades);
-      localStorage.setItem('tradient_trades_csv', csvContent);
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(trades));
       
-      // Trigger storage event to notify other components
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: 'tradient_trades_csv',
-        newValue: csvContent
-      }));
-      
-      // Also trigger custom event for same-tab updates
+      // Single custom event for same-tab updates (no StorageEvent needed)
       window.dispatchEvent(new CustomEvent('tradesUpdated', {
         detail: { tradesCount: trades.length }
       }));
     } catch (error) {
       console.error('Error saving trades to localStorage:', error);
+      // Handle quota exceeded — try trimming old data
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        console.warn('localStorage quota exceeded. Consider reducing data size.');
+      }
     }
   }
 
   static loadFromLocalStorage(): CSVTradeData[] {
     try {
-      const csvContent = localStorage.getItem('tradient_trades_csv');
-      if (csvContent) {
-        return this.parseFromCSV(csvContent);
+      const raw = localStorage.getItem(this.STORAGE_KEY);
+      if (!raw) return [];
+
+      // Try JSON first (new format), fall back to CSV (old format)
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      } catch {
+        // Not valid JSON — must be old CSV format, parse it
+        return this.parseFromCSV(raw);
       }
     } catch (error) {
       console.error('Error loading trades from localStorage:', error);
