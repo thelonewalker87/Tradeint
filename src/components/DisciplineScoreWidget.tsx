@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion';
 import { Shield, TrendingUp, AlertTriangle, Brain, Target } from 'lucide-react';
-import { allMockTrades } from '@/data';
 import { calculateDisciplineScore, getDisciplineLevel, getImprovementRecommendations } from '@/lib/scoring';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { CSVTradeData } from '@/csvManager';
+import { AIApiService } from '@/services/AIApiService';
 
 const categoryIcons = {
   'Risk Management': Shield,
@@ -20,8 +21,15 @@ const categoryColors = {
   'Consistency': 'from-orange-500 to-red-600'
 };
 
-export default function DisciplineScoreWidget() {
-  const disciplineScore = calculateDisciplineScore(allMockTrades);
+interface DisciplineScoreWidgetProps {
+  trades: CSVTradeData[];
+}
+
+export default function DisciplineScoreWidget({ trades }: DisciplineScoreWidgetProps) {
+  // Map CSV data to Trade objects for the scoring logic
+  const mappedTrades = trades.map(t => AIApiService.mapCSVToTradeObject(t));
+  
+  const disciplineScore = calculateDisciplineScore(mappedTrades);
   const level = getDisciplineLevel(disciplineScore.overall);
   const recommendations = getImprovementRecommendations(disciplineScore);
 
@@ -68,7 +76,7 @@ export default function DisciplineScoreWidget() {
                 cx="64"
                 cy="64"
                 r="56"
-                stroke="hsl(220, 15%, 20%)"
+                stroke="hsl(var(--muted))"
                 strokeWidth="12"
                 fill="none"
               />
@@ -76,7 +84,7 @@ export default function DisciplineScoreWidget() {
                 cx="64"
                 cy="64"
                 r="56"
-                stroke="url(#gradient)"
+                stroke="url(#score-gradient)"
                 strokeWidth="12"
                 fill="none"
                 strokeDasharray={`${2 * Math.PI * 56}`}
@@ -84,7 +92,7 @@ export default function DisciplineScoreWidget() {
                 className="transition-all duration-1000 ease-out"
               />
               <defs>
-                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="score-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="hsl(200, 90%, 50%)" />
                   <stop offset="100%" stopColor="hsl(280, 90%, 60%)" />
                 </linearGradient>
@@ -101,7 +109,7 @@ export default function DisciplineScoreWidget() {
 
         {/* Category Breakdown */}
         <div className="space-y-4">
-          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+          <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
             Performance Breakdown
           </h4>
           <div className="grid grid-cols-1 gap-4">
@@ -124,17 +132,13 @@ export default function DisciplineScoreWidget() {
                       </div>
                       <span className="text-sm font-medium">{category.category}</span>
                     </div>
-                    <span className="text-sm font-bold">{category.score}%</span>
+                    <span className="text-sm font-bold">{Math.round(category.score)}%</span>
                   </div>
                   
                   <Progress 
                     value={category.score} 
                     className="h-2"
                   />
-                  
-                  <div className="text-xs text-muted-foreground">
-                    Weight: {(category.weight * 100).toFixed(0)}%
-                  </div>
                 </motion.div>
               );
             })}
@@ -144,20 +148,20 @@ export default function DisciplineScoreWidget() {
         {/* Improvement Recommendations */}
         {recommendations.length > 0 && (
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              Improvement Recommendations
+            <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+              Recommendations
             </h4>
             <div className="space-y-2">
-              {recommendations.slice(0, 3).map((rec, index) => (
+              {recommendations.slice(0, 2).map((rec, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800"
+                  className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20"
                 >
-                  <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <AlertTriangle className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
                     {rec}
                   </p>
                 </motion.div>
@@ -165,29 +169,6 @@ export default function DisciplineScoreWidget() {
             </div>
           </div>
         )}
-
-        {/* Key Factors */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-            Key Factors
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {disciplineScore.breakdown.map((category) => (
-              <div key={category.category} className="space-y-2">
-                <div className="text-xs font-medium text-muted-foreground">
-                  {category.category}
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {category.factors.slice(0, 2).map((factor, index) => (
-                    <Badge key={index} variant="outline" className="text-xs">
-                      {factor}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </CardContent>
     </Card>
   );

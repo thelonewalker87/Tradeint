@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { TrendingUp, Brain, Calendar, Target, Activity, DollarSign, Award, AlertCircle, BarChart3 } from 'lucide-react';
+import { TrendingUp, Brain, Calendar, Target, Activity, DollarSign, Award, AlertCircle, BarChart3, Loader2, Sparkles } from 'lucide-react';
 import CSVManager from '@/csvManager';
 import { CSVTradeData } from '@/csvManager';
 import PerformanceCards from '@/components/PerformanceCards';
@@ -12,9 +12,13 @@ import EnhancedCSVUpload from '@/components/upload/EnhancedCSVUpload';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { AIApiService, AnalysePerformanceResult, GradeResult } from '@/services/AIApiService';
+import { toast } from 'sonner';
 
 export default function DashboardPage() {
   const [currentTrades, setCurrentTrades] = useState<CSVTradeData[]>([]);
+  const [aiInsights, setAiInsights] = useState<AnalysePerformanceResult | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const loadTrades = useCallback(() => {
     try {
@@ -38,13 +42,51 @@ export default function DashboardPage() {
   useEffect(() => {
     loadTrades();
 
-    const handleTradesUpdate = () => loadTrades();
+    const handleTradesUpdate = () => {
+      loadTrades();
+      setAiInsights(null); // Reset AI insights when data changes
+    };
     window.addEventListener('tradesUpdated', handleTradesUpdate);
 
     return () => {
       window.removeEventListener('tradesUpdated', handleTradesUpdate);
     };
   }, [loadTrades]);
+
+  const handleDeepAIAnalysis = async () => {
+    if (currentTrades.length === 0) return;
+    
+    setIsAnalyzing(true);
+    try {
+      // 1. Map trades to AI inputs
+      const aiInputs = currentTrades.slice(-20).map(t => AIApiService.mapCSVToAITrade(t));
+      
+      // 2. Grade them (sequential for safety with free tier API limits, but could be parallel)
+      // Note: In a real app we might cache these grades. 
+      // For this demo, we'll grade the most recent batch.
+      const gradedTrades: GradeResult[] = [];
+      for (const input of aiInputs) {
+        try {
+          const result = await AIApiService.gradeTrade(input);
+          gradedTrades.push(result);
+        } catch (e) {
+          console.warn('Failed to grade a trade, skipping...', e);
+        }
+      }
+
+      if (gradedTrades.length === 0) throw new Error('Could not grade any trades');
+
+      // 3. Perform batch performance analysis
+      const analysis = await AIApiService.analysePerformance(gradedTrades);
+      setAiInsights(analysis);
+      toast.success('Llama-3 Analysis Complete!');
+    } catch (error) {
+      console.error('AI Analysis Error:', error);
+      toast.error('Failed to connect to Llama AI Server. Is it running on port 8000?');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   /** Extracted sample trades to a function to keep the component body clean */
   function getSampleTrades(): CSVTradeData[] {
@@ -59,21 +101,7 @@ export default function DashboardPage() {
       { id: 'TR-008', date: '2025-03-08', pair: 'GBP/JPY', direction: 'short', entry: 190.54, exit: 191.12, positionSize: 0.8, result: -464.00, rr: -1.5, ruleViolation: 'No Stop Loss', notes: 'Forgot to set stop loss' },
       { id: 'TR-009', date: '2025-03-07', pair: 'EUR/USD', direction: 'long', entry: 1.0765, exit: 1.0812, positionSize: 2.0, result: 940.00, rr: 2.8, ruleViolation: null, notes: 'Breakout trade with excellent momentum' },
       { id: 'TR-010', date: '2025-03-06', pair: 'USD/CHF', direction: 'short', entry: 0.8821, exit: 0.8789, positionSize: 1.0, result: 362.00, rr: 1.9, ruleViolation: null, notes: 'Safe haven trade' },
-      { id: 'TR-011', date: '2025-03-05', pair: 'AUD/JPY', direction: 'long', entry: 98.45, exit: 97.88, positionSize: 1.2, result: -684.00, rr: -2.1, ruleViolation: 'Revenge Trade', notes: 'Revenge trading after loss' },
-      { id: 'TR-012', date: '2025-03-04', pair: 'EUR/USD', direction: 'long', entry: 1.0901, exit: 1.0948, positionSize: 1.0, result: 470.00, rr: 2.5, ruleViolation: null, notes: 'Technical analysis paid off' },
-      { id: 'TR-013', date: '2025-03-03', pair: 'USD/CAD', direction: 'long', entry: 1.3456, exit: 1.3512, positionSize: 0.8, result: 448.00, rr: 2.2, ruleViolation: null, notes: 'Oil price rally helped' },
-      { id: 'TR-014', date: '2025-03-02', pair: 'GBP/USD', direction: 'short', entry: 1.2789, exit: 1.2745, positionSize: 1.5, result: 660.00, rr: 3.0, ruleViolation: null, notes: 'Perfect short setup at resistance' },
-      { id: 'TR-015', date: '2025-03-01', pair: 'EUR/JPY', direction: 'long', entry: 162.34, exit: 161.89, positionSize: 1.0, result: -450.00, rr: -1.8, ruleViolation: 'Early Entry', notes: 'Entered too early' },
-      { id: 'TR-016', date: '2025-02-28', pair: 'AUD/USD', direction: 'short', entry: 0.6621, exit: 0.6587, positionSize: 1.2, result: 408.00, rr: 2.0, ruleViolation: null, notes: 'Risk sentiment shift' },
-      { id: 'TR-017', date: '2025-02-27', pair: 'USD/CHF', direction: 'long', entry: 0.8756, exit: 0.8723, positionSize: 0.5, result: -165.00, rr: -0.9, ruleViolation: 'Overtrading', notes: 'Too many trades today' },
-      { id: 'TR-018', date: '2025-02-26', pair: 'EUR/GBP', direction: 'long', entry: 0.8423, exit: 0.8467, positionSize: 1.0, result: 440.00, rr: 2.2, ruleViolation: null, notes: 'Cross currency pair worked well' },
-      { id: 'TR-019', date: '2025-02-25', pair: 'GBP/JPY', direction: 'long', entry: 189.67, exit: 190.45, positionSize: 0.8, result: 624.00, rr: 2.8, ruleViolation: null, notes: 'Yen weakness boosted GBPJPY' },
-      { id: 'TR-020', date: '2025-02-24', pair: 'NZD/USD', direction: 'short', entry: 0.6289, exit: 0.6324, positionSize: 1.0, result: -350.00, rr: -1.4, ruleViolation: 'Against Trend', notes: 'Fighting the uptrend' },
-      { id: 'TR-021', date: '2025-02-23', pair: 'USD/JPY', direction: 'long', entry: 149.78, exit: 150.34, positionSize: 1.5, result: 840.00, rr: 3.5, ruleViolation: null, notes: 'Fed minutes boosted USD' },
-      { id: 'TR-022', date: '2025-02-22', pair: 'EUR/USD', direction: 'short', entry: 1.0987, exit: 1.0943, positionSize: 1.0, result: 440.00, rr: 2.0, ruleViolation: null, notes: 'ECB comments weakened euro' },
-      { id: 'TR-023', date: '2025-02-21', pair: 'AUD/CAD', direction: 'long', entry: 0.8856, exit: 0.8891, positionSize: 0.8, result: 280.00, rr: 1.6, ruleViolation: null, notes: 'Commodity correlation worked' },
-      { id: 'TR-024', date: '2025-02-20', pair: 'GBP/USD', direction: 'short', entry: 1.2876, exit: 1.2912, positionSize: 1.2, result: -432.00, rr: -1.6, ruleViolation: 'Late Entry', notes: 'Missed the best entry' },
-      { id: 'TR-025', date: '2025-02-19', pair: 'USD/CHF', direction: 'short', entry: 0.8898, exit: 0.8854, positionSize: 1.0, result: 440.00, rr: 2.2, ruleViolation: null, notes: 'Swiss franc strength' }
+      { id: 'TR-011', date: '2025-03-05', pair: 'AUD/JPY', direction: 'long', entry: 98.45, exit: 97.88, positionSize: 1.2, result: -684.00, rr: -2.1, ruleViolation: 'Revenge Trade', notes: 'Revenge trading after loss' }
     ];
   }
 
@@ -146,31 +174,19 @@ export default function DashboardPage() {
       color: 'text-orange-500',
       bgColor: 'bg-orange-500/10',
       borderColor: 'border-orange-500/20',
-      trend: '+15',
+      trend: `+${currentTrades.length}`,
       trendUp: true
     }
   ];
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
   };
 
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        type: "spring",
-        stiffness: 100
-      }
-    }
+    visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 } }
   };
 
   return (
@@ -178,52 +194,54 @@ export default function DashboardPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-8 max-w-[1600px] mx-auto"
+      className="space-y-8 max-w-[1600px] mx-auto pb-20"
     >
       {/* Header Section */}
       <motion.div variants={itemVariants} className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-primary/5 rounded-3xl blur-3xl" />
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-primary/5 rounded-3xl blur-3xl opacity-50" />
         <div className="relative flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-primary to-primary/80 rounded-2xl shadow-lg">
-              <TrendingUp className="h-7 w-7 text-primary-foreground" />
+            <div className="p-3 bg-gradient-to-br from-primary to-primary/80 rounded-2xl shadow-lg border border-white/10">
+              <TrendingUp className="h-7 w-7 text-white" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent tracking-tight">
                 Trading Dashboard
               </h1>
-              <p className="text-lg text-muted-foreground mt-1">
-                Master your trading discipline with AI-powered insights
+              <p className="text-lg text-muted-foreground font-medium mt-1">
+                Real-time discipline scoring and Llama-3 AI analytics
               </p>
             </div>
           </div>
-          <Badge variant="outline" className="px-4 py-2 text-sm">
-            <Activity className="w-4 h-4 mr-2" />
-            Live Trading
-          </Badge>
+          <div className="flex items-center gap-3">
+             <Badge variant="outline" className="px-4 py-2 text-xs font-bold border-primary/20 bg-primary/5">
+              {localStorage.getItem('tradient_trades_csv') ? 'LIVE DATA' : 'SAMPLE DATA'}
+            </Badge>
+          </div>
         </div>
       </motion.div>
+
+      {/* Stats Overview */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statsCards.map((stat, index) => (
           <motion.div
             key={stat.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
+            whileHover={{ y: -4 }}
+            className="transition-all duration-300"
           >
-            <Card className={`glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${stat.borderColor} bg-card/50`}>
+            <Card className={`glass-card border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${stat.borderColor} bg-card/40 backdrop-blur-md`}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className={`p-2 rounded-xl ${stat.bgColor}`}>
                     <stat.icon className={`h-5 w-5 ${stat.color}`} />
                   </div>
-                  <Badge variant="secondary" className={`text-xs ${stat.trendUp ? 'text-green-500' : 'text-red-500'}`}>
+                  <Badge variant="secondary" className={`text-[10px] font-bold ${stat.trendUp ? 'text-green-500' : 'text-red-500'}`}>
                     {stat.trend}
                   </Badge>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">{stat.title}</p>
-                  <p className="text-3xl font-bold">{stat.value}</p>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">{stat.title}</p>
+                  <p className="text-3xl font-black tracking-tighter">{stat.value}</p>
                 </div>
               </CardContent>
             </Card>
@@ -231,49 +249,30 @@ export default function DashboardPage() {
         ))}
       </motion.div>
 
-      {/* Data Management Section */}
+      {/* Main Analysis Section */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <motion.div variants={itemVariants} className="xl:col-span-1">
+          <DisciplineScoreWidget trades={currentTrades} />
+        </motion.div>
+        <motion.div variants={itemVariants} className="xl:col-span-2">
+          <BehavioralInsights 
+            trades={currentTrades} 
+            aiInsights={aiInsights}
+            isAnalyzing={isAnalyzing}
+            onAnalyze={handleDeepAIAnalysis}
+          />
+        </motion.div>
+      </div>
+
       <motion.div variants={itemVariants}>
         <EnhancedCSVUpload />
       </motion.div>
 
-      {/* Main Performance Section */}
-      <motion.div variants={itemVariants} className="space-y-8">
-        <Card className="glass-card border-0 shadow-lg">
-          <CardHeader>
-            <CardTitle>Performance Overview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Total P&L</p>
-                <p className={`text-2xl font-bold ${metrics.totalProfitLoss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  ${metrics.totalProfitLoss.toFixed(2)}
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Win Rate</p>
-                <p className="text-2xl font-bold">{metrics.winRate.toFixed(1)}%</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Expectancy</p>
-                <p className="text-2xl font-bold">${metrics.expectancy.toFixed(2)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
+      <motion.div variants={itemVariants}>
         <TradeJournalTable trades={currentTrades} />
       </motion.div>
-
-      {/* Discipline Score & Insights Section */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        <div className="xl:col-span-1">
-          <DisciplineScoreWidget />
-        </div>
-        <div className="xl:col-span-2">
-          <BehavioralInsights />
-        </div>
-      </motion.div>
+      
+      <NewsSection />
     </motion.div>
   );
 }
