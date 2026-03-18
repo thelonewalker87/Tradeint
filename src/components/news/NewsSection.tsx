@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Newspaper, TrendingUp, TrendingDown, Clock, Filter, 
-  ExternalLink, AlertTriangle, Calendar, Globe 
+  Newspaper, TrendingUp, TrendingDown, Clock, Filter, Globe 
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,19 +14,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import NewsService, { NewsItem } from '@/services/NewsService';
 
-interface NewsItem {
-  id: string;
-  title: string;
-  summary: string;
-  source: string;
-  publishedAt: string;
-  category: 'market' | 'economic' | 'crypto' | 'forex' | 'commodities';
-  sentiment: 'bullish' | 'bearish' | 'neutral';
-  impact: 'high' | 'medium' | 'low';
-  url?: string;
-  symbols?: string[];
-}
+const categoryColors = {
+  market: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300',
+  economic: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300',
+  crypto: 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300',
+  forex: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300',
+  commodities: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300'
+};
+
+const sentimentColors = {
+  bullish: 'text-green-600 dark:text-green-400',
+  bearish: 'text-red-600 dark:text-red-400',
+  neutral: 'text-gray-600 dark:text-gray-400'
+};
+
+const impactColors = {
+  high: 'bg-red-500',
+  medium: 'bg-yellow-500',
+  low: 'bg-green-500'
+};
 
 interface VolatilityData {
   symbol: string;
@@ -39,70 +46,6 @@ interface VolatilityData {
   high: number;
   low: number;
 }
-
-// Mock data
-const mockNews: NewsItem[] = [
-  {
-    id: '1',
-    title: 'Fed Signals Potential Rate Cut in Q2 2024',
-    summary: 'Federal Reserve officials indicated that monetary policy easing could begin in the second quarter if inflation continues to moderate.',
-    source: 'Reuters',
-    publishedAt: '2024-03-15T10:30:00Z',
-    category: 'economic',
-    sentiment: 'bullish',
-    impact: 'high',
-    symbols: ['USD', 'SPX', 'DOW'],
-    url: 'https://reuters.com/markets/us-fed-rate-cut-2024-03-15'
-  },
-  {
-    id: '2',
-    title: 'EUR/USD Technical Analysis: Key Support at 1.0850',
-    summary: 'The EUR/USD pair is approaching critical support levels with potential for a significant breakout.',
-    source: 'TradingView',
-    publishedAt: '2024-03-15T09:15:00Z',
-    category: 'forex',
-    sentiment: 'neutral',
-    impact: 'medium',
-    symbols: ['EUR/USD'],
-    url: 'https://tradingview.com/analysis-eur-usd'
-  },
-  {
-    id: '3',
-    title: 'Bitcoin Surges Past $70,000 Amid ETF Optimism',
-    summary: 'Bitcoin reached new yearly highs as institutional investors show increased interest in crypto ETFs.',
-    source: 'CoinDesk',
-    publishedAt: '2024-03-15T08:45:00Z',
-    category: 'crypto',
-    sentiment: 'bullish',
-    impact: 'high',
-    symbols: ['BTC', 'ETH'],
-    url: 'https://coindesk.com/bitcoin-etf-2024-03-15'
-  },
-  {
-    id: '4',
-    title: 'Oil Prices Rise on Supply Concerns from Middle East',
-    summary: 'Crude oil futures gained 3% as geopolitical tensions raise supply disruption concerns.',
-    source: 'Bloomberg',
-    publishedAt: '2024-03-15T07:20:00Z',
-    category: 'commodities',
-    sentiment: 'bearish',
-    impact: 'medium',
-    symbols: ['OIL', 'XLE'],
-    url: 'https://bloomberg.com/oil-prices-middle-east-2024-03-15'
-  },
-  {
-    id: '5',
-    title: 'European Markets Open Higher on Tech Earnings',
-    summary: 'European equity indices rose as better-than-expected tech earnings boosted investor confidence.',
-    source: 'Financial Times',
-    publishedAt: '2024-03-15T06:30:00Z',
-    category: 'market',
-    sentiment: 'bullish',
-    impact: 'medium',
-    symbols: ['DAX', 'CAC40', 'FTSE'],
-    url: 'https://ft.com/european-markets-tech-earnings-2024-03-15'
-  }
-];
 
 const mockVolatility: VolatilityData[] = [
   {
@@ -147,32 +90,26 @@ const mockVolatility: VolatilityData[] = [
   }
 ];
 
-const categoryColors = {
-  market: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300',
-  economic: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300',
-  crypto: 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300',
-  forex: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300',
-  commodities: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300'
-};
-
-const sentimentColors = {
-  bullish: 'text-green-600 dark:text-green-400',
-  bearish: 'text-red-600 dark:text-red-400',
-  neutral: 'text-gray-600 dark:text-gray-400'
-};
-
-const impactColors = {
-  high: 'bg-red-500',
-  medium: 'bg-yellow-500',
-  low: 'bg-green-500'
-};
-
 export default function NewsSection() {
+  const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedTimeRange, setSelectedTimeRange] = useState('today');
   const [activeTab, setActiveTab] = useState('news');
 
-  const filteredNews = mockNews.filter(news => {
+  useEffect(() => {
+    const newsService = NewsService.getInstance();
+    
+    setNewsList(newsService.getNews());
+
+    const handleNewsUpdate = (data: NewsItem[]) => {
+      setNewsList([...data]);
+    };
+
+    newsService.subscribe(handleNewsUpdate);
+    return () => newsService.unsubscribe(handleNewsUpdate);
+  }, []);
+
+  const filteredNews = newsList.filter(news => {
     if (selectedCategory === 'all') return true;
     return news.category === selectedCategory;
   });
@@ -219,7 +156,6 @@ export default function NewsSection() {
       </CardHeader>
       
       <CardContent className="space-y-6">
-        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="news" className="flex items-center gap-2">
@@ -232,7 +168,6 @@ export default function NewsSection() {
             </TabsTrigger>
           </TabsList>
 
-          {/* News Tab */}
           <TabsContent value="news" className="space-y-4 mt-4">
             {/* Category Filter */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -305,16 +240,6 @@ export default function NewsSection() {
                             </span>
                           </div>
 
-                          {news.url && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs"
-                              onClick={() => window.open(news.url, '_blank')}
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          )}
                         </div>
 
                         {/* Symbols */}
