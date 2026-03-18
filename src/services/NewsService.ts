@@ -124,11 +124,7 @@ class NewsService {
                 toast(newsItem.title, {
                   description: `${newsItem.impact.toUpperCase()} IMPACT • ${newsItem.category.toUpperCase()}`,
                   icon: newsItem.impact === 'high' ? '🚨' : '📰',
-                  duration: 6000,
-                  action: {
-                    label: 'Read',
-                    onClick: () => window.open(newsItem.url, '_blank')
-                  }
+                  duration: 6000
                 });
               }
             }
