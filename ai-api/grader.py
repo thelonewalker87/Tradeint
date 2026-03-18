@@ -9,22 +9,16 @@
 # in ai_router.py without going through this file.
 
 import os
-from dotenv import load_dotenv
-import json
 from openai import OpenAI
+import json
 from models import TradeInput, TradeMetrics, GradeResult, DimensionScore
 from metrics import calculate_metrics, detect_patterns
 
-# Load env vars
-load_dotenv()
+MODEL = "openrouter/free"
 
-MODEL = "meta-llama/llama-3.3-70b-instruct:free"
-
-# Initialize client safely
-api_key = os.environ.get("OPENROUTER_API_KEY")
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=api_key if api_key else "missing_key",
+client = OpenAI(                                   
+    base_url = "https://openrouter.ai/api/v1",
+    api_key  = os.environ.get("OPENROUTER_API_KEY"),
 )
 
 SYSTEM_PROMPT = """
@@ -91,65 +85,6 @@ def score_to_letter(score: int) -> str:
     return "F"
 
 
-def get_local_fallback_grade(trade: TradeInput, metrics: TradeMetrics, patterns: list[str]) -> GradeResult:
-    """
-    Generates a high-quality mock grade when no API key is present.
-    Based on the deterministic rules defined in the prompt.
-    """
-    # 1. Entry Quality (Max 25)
-    e_score = 20
-    e_feedback = "Good entry based on technical setup."
-    if metrics.risk_reward_ratio < 1.0:
-        e_score -= 10
-        e_feedback = "Poor planned Risk/Reward ratio for this entry."
-    
-    # 2. Risk Management (Max 25)
-    r_score = 25
-    r_feedback = "Professional risk management."
-    if metrics.risk_percent > 2.0:
-        r_score -= 10
-        r_feedback = f"Risk per trade ({metrics.risk_percent}%) is too high. Aim for < 2%."
-    if metrics.hit_stop and metrics.actual_rr < -1.1:
-         r_score -= 5
-         r_feedback = "Stop loss was hit and potentially slipped or moved."
-
-    # 3. Trade Thesis (Max 25)
-    t_score = 22
-    t_feedback = "Strong reasoning and setup identification."
-    if not trade.trade_notes or len(trade.trade_notes) < 20:
-        t_score = 10
-        t_feedback = "Insufficient trade notes. Process cannot be verified without a clear thesis."
-
-    # 4. Exit Quality (Max 25)
-    x_score = 20
-    x_feedback = "Disciplined exit."
-    if not trade.take_profit:
-        x_score = 15
-        x_feedback = "No take profit defined. Exit was likely discretionary."
-    if "early_exit_winner" in patterns:
-        x_score -= 5
-        x_feedback = "Exited a winner too early before the target was reached."
-
-    overall = e_score + r_score + t_score + x_score
-    summary = f"Overall processed trade on {trade.ticker}. {'Good' if overall > 70 else 'Fair'} discipline shown. "
-    if metrics.pnl > 0:
-        summary += "Result was positive, but continue focusing on thesis documentation."
-    else:
-        summary += "Despite the loss, the risk parameters were adhered to."
-
-    return GradeResult(
-        overall_score   = overall,
-        letter_grade    = score_to_letter(overall),
-        metrics         = metrics,
-        entry_quality   = DimensionScore(score=e_score, feedback=e_feedback),
-        risk_management = DimensionScore(score=r_score, feedback=r_feedback),
-        trade_thesis    = DimensionScore(score=t_score, feedback=t_feedback),
-        exit_quality    = DimensionScore(score=x_score, feedback=x_feedback),
-        summary         = summary,
-        patterns        = patterns,
-    )
-
-
 def grade_trade(trade: TradeInput) -> GradeResult:
     """
     Full pipeline:
@@ -162,42 +97,35 @@ def grade_trade(trade: TradeInput) -> GradeResult:
     metrics  = calculate_metrics(trade)
     patterns = detect_patterns(trade, metrics)
 
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key or api_key == "your_key_here":
-        return get_local_fallback_grade(trade, metrics, patterns)
 
+    response = client.chat.completions.create(
+        model    = MODEL,
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user",   "content": build_prompt(trade, metrics, patterns)}
+        ]
+    )
+
+    raw = response.choices[0].message.content
     try:
-        response = client.chat.completions.create(
-            model    = MODEL,
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": build_prompt(trade, metrics, patterns)}
-            ]
-        )
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed = json.loads(raw.strip().removeprefix("```json").removesuffix("```").strip())
 
-        raw = response.choices[0].message.content
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            parsed = json.loads(raw.strip().removeprefix("```json").removesuffix("```").strip())
+    entry   = DimensionScore(**parsed["entry_quality"])
+    risk    = DimensionScore(**parsed["risk_management"])
+    thesis  = DimensionScore(**parsed["trade_thesis"])
+    exit_q  = DimensionScore(**parsed["exit_quality"])
+    overall = entry.score + risk.score + thesis.score + exit_q.score
 
-        entry   = DimensionScore(**parsed["entry_quality"])
-        risk    = DimensionScore(**parsed["risk_management"])
-        thesis  = DimensionScore(**parsed["trade_thesis"])
-        exit_q  = DimensionScore(**parsed["exit_quality"])
-        overall = entry.score + risk.score + thesis.score + exit_q.score
-
-        return GradeResult(
-            overall_score   = overall,
-            letter_grade    = score_to_letter(overall),
-            metrics         = metrics,
-            entry_quality   = entry,
-            risk_management = risk,
-            trade_thesis    = thesis,
-            exit_quality    = exit_q,
-            summary         = parsed["summary"],
-            patterns        = patterns,
-        )
-    except Exception as e:
-        print(f"AI Grading failed: {e}. Falling back to local rules.")
-        return get_local_fallback_grade(trade, metrics, patterns)
+    return GradeResult(
+        overall_score   = overall,
+        letter_grade    = score_to_letter(overall),
+        metrics         = metrics,
+        entry_quality   = entry,
+        risk_management = risk,
+        trade_thesis    = thesis,
+        exit_quality    = exit_q,
+        summary         = parsed["summary"],
+        patterns        = patterns,
+    )
