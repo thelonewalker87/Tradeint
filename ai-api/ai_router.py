@@ -152,28 +152,23 @@ def handle_journal_reflection(payload: dict) -> dict:
 def handle_explain_grade(payload: dict) -> dict:
     """
     Rewrites an existing GradeResult in plain English for the trader.
-    payload: { grade: GradeResult dict }
-    returns: { explanation: str }
     """
     g = payload["grade"]
-    response = client.messages.create(
-        model      = MODEL,
-        max_tokens = 256,
-        system     = "You are a friendly trading coach. Use plain language, no jargon.",
-        messages   = [{
-            "role": "user",
-            "content": f"""
-Explain this grade in plain English. Under 100 words. End with one action for tomorrow.
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key or api_key == "your_key_here":
+        return {"explanation": f"This trade scored a {g['letter_grade']}. Your entry was {g['entry_quality']['score']}/25. Tomorrow, focus on waiting for your setup to fully form."}
 
-Grade: {g['letter_grade']} ({g['overall_score']}/100)
-Entry:  {g['entry_quality']['score']}/25 — {g['entry_quality']['feedback']}
-Risk:   {g['risk_management']['score']}/25 — {g['risk_management']['feedback']}
-Thesis: {g['trade_thesis']['score']}/25 — {g['trade_thesis']['feedback']}
-Exit:   {g['exit_quality']['score']}/25 — {g['exit_quality']['feedback']}
-Patterns: {g['patterns']}"""
-        }]
-    )
-    return {"explanation": response.content[0].text}
+    try:
+        response = client.chat.completions.create(
+            model      = MODEL,
+            messages   = [{
+                "role": "user",
+                "content": f"Explain this grade: {json.dumps(g)}. Be brief."
+            }]
+        )
+        return {"explanation": response.choices[0].message.content}
+    except Exception as e:
+        return {"explanation": "Explanation unavailable (Check API Key)."}
 
 
 # ── Handler registry ───────────────────────────────────────────────────────────
@@ -198,6 +193,7 @@ async def ai_query(request: AIRequest):
     try:
         return handler(request.payload)
     except Exception as e:
+        print(f"Handler Error [{request.type}]: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
