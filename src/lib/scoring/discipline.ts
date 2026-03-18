@@ -3,26 +3,32 @@ import { analyzeBehavioralPatterns } from '../behavioral';
 
 export function calculateRiskConsistencyScore(trades: Trade[]): number {
   if (trades.length === 0) return 100;
-  
-  // Calculate position size consistency
-  const positionSizes = trades.map(t => t.positionSize);
-  const avgPositionSize = positionSizes.reduce((sum, size) => sum + size, 0) / positionSizes.length;
-  const positionVariance = positionSizes.reduce((sum, size) => sum + Math.pow(size - avgPositionSize, 2), 0) / positionSizes.length;
-  const positionStdDev = Math.sqrt(positionVariance);
-  const positionCV = avgPositionSize > 0 ? (positionStdDev / avgPositionSize) : 0;
-  
-  // Calculate risk-reward consistency
-  const riskRewards = trades.map(t => t.riskReward);
-  const avgRiskReward = riskRewards.reduce((sum, rr) => sum + rr, 0) / riskRewards.length;
-  const rrVariance = riskRewards.reduce((sum, rr) => sum + Math.pow(rr - avgRiskReward, 2), 0) / riskRewards.length;
-  const rrStdDev = Math.sqrt(rrVariance);
-  const rrCV = avgRiskReward > 0 ? (rrStdDev / avgRiskReward) : 0;
-  
-  // Score based on coefficient of variation (lower is better)
-  const positionScore = Math.max(0, 100 - (positionCV * 200)); // 200% CV = 0 score
-  const rrScore = Math.max(0, 100 - (rrCV * 150)); // 150% CV = 0 score
-  
-  return (positionScore + rrScore) / 2;
+
+  // --- Metric 1: Position size consistency (CV-based, but milder penalty) ---
+  const positionSizes = trades.map(t => t.positionSize).filter(s => s > 0);
+  let positionScore = 80; // default reasonable if no valid sizes
+  if (positionSizes.length > 1) {
+    const avgPos = positionSizes.reduce((a, b) => a + b, 0) / positionSizes.length;
+    const posVariance = positionSizes.reduce((sum, s) => sum + Math.pow(s - avgPos, 2), 0) / positionSizes.length;
+    const posCV = avgPos > 0 ? Math.sqrt(posVariance) / avgPos : 0;
+    // CV of 0 = perfect (100), CV of 1.0 = very inconsistent (0), scale gently
+    positionScore = Math.max(0, Math.min(100, 100 - posCV * 100));
+  }
+
+  // --- Metric 2: % of trades with a positive planned R:R >= 1.0 ---
+  const rrQuality = trades.filter(t => t.riskReward >= 1.0).length / trades.length;
+  const rrScore = rrQuality * 100; // 100% of trades with RR>=1 = 100 score
+
+  // --- Metric 3: Stop loss adherence (penalise "no-stop-loss" violations) ---
+  const noStopTrades = trades.filter(t =>
+    t.ruleViolations.some(v =>
+      v.type === 'no-stop-loss' || v.description?.toLowerCase().includes('stop')
+    )
+  ).length;
+  const stopAdherence = Math.max(0, 100 - (noStopTrades / trades.length) * 100);
+
+  // Weighted combination
+  return (positionScore * 0.35 + rrScore * 0.45 + stopAdherence * 0.20);
 }
 
 export function calculateRuleAdherenceScore(trades: Trade[]): number {
@@ -90,52 +96,62 @@ export function calculateEmotionalControlScore(trades: Trade[]): number {
 }
 
 export function calculateConsistencyScore(trades: Trade[]): number {
-  if (trades.length < 10) return 50; // Not enough data
+  if (trades.length === 0) return 0;
+
+  // For small datasets, use a simplified but real score based on:
+  // 1. Setup type consistency (are they sticking to one setup?)
+  // 2. P&L trend consistency (not wildly erratic)
+  // 3. Rule violation trend (improving or worsening?)
   
-  // Time consistency - regular trading patterns
-  const tradesByHour = new Map<number, number>();
-  const tradesByDay = new Map<number, number>();
-  
-  trades.forEach(trade => {
-    const hour = trade.entryTime.getHours();
-    const day = trade.entryTime.getDay();
-    
-    tradesByHour.set(hour, (tradesByHour.get(hour) || 0) + 1);
-    tradesByDay.set(day, (tradesByDay.get(day) || 0) + 1);
-  });
-  
-  // Calculate trading frequency consistency
-  const hourValues = Array.from(tradesByHour.values());
-  const dayValues = Array.from(tradesByDay.values());
-  
-  const hourVariance = hourValues.reduce((sum, val) => sum + Math.pow(val - hourValues.reduce((a, b) => a + b, 0) / hourValues.length, 2), 0) / hourValues.length;
-  const dayVariance = dayValues.reduce((sum, val) => sum + Math.pow(val - dayValues.reduce((a, b) => a + b, 0) / dayValues.length, 2), 0) / dayValues.length;
-  
-  const timeConsistency = Math.max(0, 100 - (Math.sqrt(hourVariance) + Math.sqrt(dayVariance)) / 2);
-  
-  // Setup consistency
+  // Setup consistency — what % of trades use the dominant setup?
   const setupCounts = new Map<string, number>();
   trades.forEach(trade => {
     setupCounts.set(trade.setupType, (setupCounts.get(trade.setupType) || 0) + 1);
   });
-  
   const dominantSetup = Math.max(...setupCounts.values());
   const setupConsistency = (dominantSetup / trades.length) * 100;
-  
-  // Performance consistency
-  const dailyPnL = new Map<string, number>();
-  trades.forEach(trade => {
-    const date = trade.exitTime.toISOString().split('T')[0];
-    dailyPnL.set(date, (dailyPnL.get(date) || 0) + trade.profitLoss);
-  });
-  
-  const dailyReturns = Array.from(dailyPnL.values());
-  const avgReturn = dailyReturns.reduce((sum, val) => sum + val, 0) / dailyReturns.length;
-  const returnVariance = dailyReturns.reduce((sum, val) => sum + Math.pow(val - avgReturn, 2), 0) / dailyReturns.length;
-  const performanceConsistency = Math.max(0, 100 - (Math.sqrt(returnVariance) / Math.abs(avgReturn) * 100));
-  
-  return (timeConsistency + setupConsistency + performanceConsistency) / 3;
+
+  // P&L consistency — penalize high variance relative to average
+  const pnls = trades.map(t => t.profitLoss);
+  const avgPnL = pnls.reduce((sum, v) => sum + v, 0) / pnls.length;
+  const variance = pnls.reduce((sum, v) => sum + Math.pow(v - avgPnL, 2), 0) / pnls.length;
+  const stdDev = Math.sqrt(variance);
+  const cv = Math.abs(avgPnL) > 0 ? stdDev / Math.abs(avgPnL) : 1;
+  const pnlConsistency = Math.max(0, 100 - Math.min(cv * 40, 100));
+
+  // Violation trend — are violations happening more toward the end (worsening)?
+  const half = Math.floor(trades.length / 2);
+  const firstHalfViolations = trades.slice(0, half).filter(t => t.ruleViolations.length > 0).length;
+  const secondHalfViolations = trades.slice(half).filter(t => t.ruleViolations.length > 0).length;
+  // If violations are decreasing → good consistency (improving discipline)
+  const violationTrend = secondHalfViolations <= firstHalfViolations ? 80 : 40;
+
+  // For larger datasets, also use time-based consistency
+  if (trades.length >= 10) {
+    const tradesByHour = new Map<number, number>();
+    const tradesByDay = new Map<number, number>();
+
+    trades.forEach(trade => {
+      const hour = trade.entryTime.getHours();
+      const day = trade.entryTime.getDay();
+      tradesByHour.set(hour, (tradesByHour.get(hour) || 0) + 1);
+      tradesByDay.set(day, (tradesByDay.get(day) || 0) + 1);
+    });
+
+    const hourValues = Array.from(tradesByHour.values());
+    const dayValues = Array.from(tradesByDay.values());
+    const hourAvg = hourValues.reduce((a, b) => a + b, 0) / hourValues.length;
+    const dayAvg = dayValues.reduce((a, b) => a + b, 0) / dayValues.length;
+    const hourVariance = hourValues.reduce((sum, val) => sum + Math.pow(val - hourAvg, 2), 0) / hourValues.length;
+    const dayVariance = dayValues.reduce((sum, val) => sum + Math.pow(val - dayAvg, 2), 0) / dayValues.length;
+    const timeConsistency = Math.max(0, 100 - (Math.sqrt(hourVariance) + Math.sqrt(dayVariance)) / 2);
+
+    return (timeConsistency * 0.25 + setupConsistency * 0.35 + pnlConsistency * 0.25 + violationTrend * 0.15);
+  }
+
+  return (setupConsistency * 0.45 + pnlConsistency * 0.35 + violationTrend * 0.20);
 }
+
 
 export function calculateDisciplineScore(trades: Trade[]): DisciplineScore {
   if (trades.length === 0) {

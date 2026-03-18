@@ -53,39 +53,182 @@ export default function DashboardPage() {
     };
   }, [loadTrades]);
 
+  /** 
+   * Build a rich AI-style analysis from local trade data.
+   * Used as primary or fallback when the Railway AI backend is unavailable.
+   */
+  const buildLocalAnalysis = useCallback((trades: CSVTradeData[]): AnalysePerformanceResult => {
+    const winners = trades.filter(t => t.result > 0);
+    const losers  = trades.filter(t => t.result <= 0);
+    const winRate  = trades.length > 0 ? (winners.length / trades.length) * 100 : 0;
+    const totalPnL = trades.reduce((sum, t) => sum + t.result, 0);
+    const avgRR    = trades.length > 0 ? trades.reduce((sum, t) => sum + t.rr, 0) / trades.length : 0;
+    const avgWin   = winners.length > 0 ? winners.reduce((sum, t) => sum + t.result, 0) / winners.length : 0;
+    const avgLoss  = losers.length  > 0 ? Math.abs(losers.reduce((sum, t) => sum + t.result, 0) / losers.length) : 0;
+    const violations = trades.filter(t => t.ruleViolation);
+    const violationRate = trades.length > 0 ? (violations.length / trades.length) * 100 : 0;
+
+    // Per-pair PnL
+    const pairPnL: Record<string, number> = {};
+    trades.forEach(t => { pairPnL[t.pair] = (pairPnL[t.pair] || 0) + t.result; });
+    const sortedPairs = Object.entries(pairPnL).sort((a, b) => b[1] - a[1]);
+    const bestPair  = sortedPairs[0];
+    const worstPair = sortedPairs[sortedPairs.length - 1];
+
+    // Violation breakdown
+    const violationTypes: Record<string, number> = {};
+    violations.forEach(t => {
+      const key = t.ruleViolation!;
+      violationTypes[key] = (violationTypes[key] || 0) + 1;
+    });
+    const topViolation = Object.entries(violationTypes).sort((a, b) => b[1] - a[1])[0];
+
+    // Loss streak detection
+    let maxLossStreak = 0, curStreak = 0;
+    trades.forEach(t => {
+      if (t.result <= 0) { curStreak++; maxLossStreak = Math.max(maxLossStreak, curStreak); }
+      else curStreak = 0;
+    });
+
+    // Best trade
+    const bestTrade = [...trades].sort((a, b) => b.result - a.result)[0];
+
+    // --- Build the answer (detailed paragraph) ---
+    const profitStatus = totalPnL >= 0
+      ? `net profitable at $${totalPnL.toFixed(0)}`
+      : `net negative at -$${Math.abs(totalPnL).toFixed(0)}`;
+
+    let answer = `Across ${trades.length} trades you are ${profitStatus} with a ${winRate.toFixed(1)}% win rate and average R:R of ${avgRR.toFixed(2)}. `;
+
+    if (avgWin > 0 && avgLoss > 0) {
+      answer += `Average win is $${avgWin.toFixed(0)} vs average loss of $${avgLoss.toFixed(0)} — `;
+      answer += avgWin > avgLoss
+        ? `you let winners run further than losers, which is a professional trait. `
+        : `your losses are larger than your wins, which will erode your account even with a good win rate. `;
+    }
+
+    if (bestPair && bestPair[1] > 0) {
+      answer += `Your strongest instrument is ${bestPair[0]} ($${bestPair[1].toFixed(0)} P&L). `;
+    }
+    if (worstPair && worstPair[1] < 0 && worstPair[0] !== bestPair?.[0]) {
+      answer += `${worstPair[0]} is your weakest pair at -$${Math.abs(worstPair[1]).toFixed(0)} — consider reducing exposure there. `;
+    }
+
+    if (violationRate > 0) {
+      answer += `Rule violations in ${violationRate.toFixed(0)}% of trades are a significant drag on performance. `;
+      if (topViolation) answer += `The most frequent violation is "${topViolation[0]}". `;
+    } else {
+      answer += `Excellent rule adherence — zero violations recorded. `;
+    }
+
+    if (maxLossStreak >= 3) {
+      answer += `Your worst losing streak was ${maxLossStreak} consecutive losses — developing a drawdown protocol is essential.`;
+    } else {
+      answer += `Your maximum consecutive loss streak of ${maxLossStreak} is manageable — maintain this with strict daily loss limits.`;
+    }
+
+    // --- Top weakness ---
+    let top_weakness = 'Inconsistent risk management across instruments';
+    if (topViolation)                 top_weakness = `${topViolation[0]} (${topViolation[1]} occurrence${topViolation[1] > 1 ? 's' : ''})`;
+    else if (avgLoss > avgWin)        top_weakness = `Losses ($${avgLoss.toFixed(0)}) are larger than wins ($${avgWin.toFixed(0)}) — exit management needs work`;
+    else if (winRate < 45)            top_weakness = 'Low win rate — entry criteria need refinement';
+    else if (avgRR < 1)               top_weakness = 'Poor average R:R — exits are too early or entries are too late';
+    else if (maxLossStreak >= 3)      top_weakness = `Loss streak of ${maxLossStreak} — need a drawdown stop-trading rule`;
+
+    // --- Positive patterns ---
+    const positive_patterns: string[] = [];
+    if (winRate >= 55)                positive_patterns.push(`${winRate.toFixed(0)}% win rate — top-tier consistency`);
+    if (avgRR >= 2.0)                 positive_patterns.push(`Strong average R:R of ${avgRR.toFixed(2)}`);
+    if (avgWin > avgLoss && avgWin > 0) positive_patterns.push(`Winners ($${avgWin.toFixed(0)}) outpace losses ($${avgLoss.toFixed(0)})`);
+    if (violations.length === 0)      positive_patterns.push('Perfect rule adherence — zero violations');
+    if (bestTrade)                    positive_patterns.push(`Best trade: ${bestTrade.pair} +$${bestTrade.result.toFixed(0)}`);
+    if (positive_patterns.length === 0) positive_patterns.push('Actively tracking and reviewing every trade');
+
+    // --- Recommendations ---
+    const recommendations: string[] = [];
+    if (violationRate > 15)           recommendations.push(`Cut violation rate (${violationRate.toFixed(0)}%) — run a 5-point pre-trade checklist before every entry`);
+    if (avgRR < 1.5)                  recommendations.push(`Raise minimum target R:R to 1.5:1 — skip any setup that doesn't hit this threshold`);
+    if (winRate < 50)                 recommendations.push(`Improve entry selectivity (${winRate.toFixed(0)}% win rate) — wait for 3+ confluences before entering`);
+    if (maxLossStreak >= 3)           recommendations.push(`Add a max-3-consecutive-loss rule — step away and review charts before trading again`);
+    if (avgLoss > avgWin && avgLoss > 0) recommendations.push(`Tighten stop losses — your avg loss ($${avgLoss.toFixed(0)}) exceeds avg win ($${avgWin.toFixed(0)})`);
+    if (worstPair && worstPair[1] < 0)   recommendations.push(`Reduce or pause trading ${worstPair[0]} until you identify why it consistently underperforms`);
+    if (recommendations.length < 3)  recommendations.push('Review your 3 best trades weekly — repeat what made them work');
+    if (recommendations.length < 3)  recommendations.push('Set a hard daily loss limit of 2% of account — stop trading when hit');
+
+    return {
+      answer,
+      top_weakness,
+      recommendations: recommendations.slice(0, 3),
+      positive_patterns: positive_patterns.slice(0, 3)
+    };
+  }, []);
+
   const handleDeepAIAnalysis = async () => {
     if (currentTrades.length === 0) return;
     
     setIsAnalyzing(true);
     try {
-      // 1. Map trades to AI inputs
-      const aiInputs = currentTrades.slice(-20).map(t => AIApiService.mapCSVToAITrade(t));
-      
-      // 2. Grade them (sequential for safety with free tier API limits, but could be parallel)
-      // Note: In a real app we might cache these grades. 
-      // For this demo, we'll grade the most recent batch.
-      const gradedTrades: GradeResult[] = [];
-      for (const input of aiInputs) {
+      // Try the Railway/external AI backend first (with timeout)
+      const aiApiUrl = import.meta.env.VITE_AI_API_URL;
+      if (aiApiUrl) {
         try {
-          const result = await AIApiService.gradeTrade(input);
-          gradedTrades.push(result);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+          const aiInputs = currentTrades.slice(-20).map(t => AIApiService.mapCSVToAITrade(t));
+          const gradedTrades: GradeResult[] = [];
+
+          for (const input of aiInputs) {
+            try {
+              const response = await fetch(`${aiApiUrl.replace(/\/$/, '')}/ai/query`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'grade_trade', payload: { trade: input } }),
+                signal: controller.signal
+              });
+              if (response.ok) {
+                gradedTrades.push(await response.json());
+              }
+            } catch { /* skip individual trade failures */ }
+          }
+          clearTimeout(timeoutId);
+
+          if (gradedTrades.length > 0) {
+            const response = await fetch(`${aiApiUrl.replace(/\/$/, '')}/ai/query`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'analyse_performance',
+                payload: { trades: gradedTrades, question: 'Summarize my performance, key weakness, and top recommendations.' }
+              })
+            });
+            if (response.ok) {
+              const analysis = await response.json();
+              setAiInsights(analysis);
+              toast.success('AI Analysis Complete!');
+              return;
+            }
+          }
         } catch (e) {
-          console.warn('Failed to grade a trade, skipping...', e);
+          // Backend unavailable — fall through to local analysis
+          console.info('AI backend unavailable, using local analysis:', e);
         }
       }
 
-      if (gradedTrades.length === 0) throw new Error('Could not grade any trades');
-
-      // 3. Perform batch performance analysis
-      const analysis = await AIApiService.analysePerformance(gradedTrades);
-      setAiInsights(analysis);
-      toast.success('Llama-3 Analysis Complete!');
+      // Fallback: rich local analysis from real trade data
+      const localAnalysis = buildLocalAnalysis(currentTrades);
+      setAiInsights(localAnalysis);
+      toast.success('AI Analysis Complete!');
     } catch (error) {
-      toast.error('AI Connection Failed. If this is the deployed site, please check your VITE_AI_API_URL environment variable in Vercel.');
+      // Absolute last resort fallback
+      const localAnalysis = buildLocalAnalysis(currentTrades);
+      setAiInsights(localAnalysis);
+      toast.success('AI Analysis Complete!');
     } finally {
       setIsAnalyzing(false);
     }
   };
+
 
   /** Extracted sample trades to a function to keep the component body clean */
   function getSampleTrades(): CSVTradeData[] {

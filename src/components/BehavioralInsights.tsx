@@ -56,7 +56,58 @@ export default function BehavioralInsights({ trades, aiInsights, isAnalyzing, on
   const localInsights = analyzeBehavioralPatterns(mappedTrades); 
   const summary = getBehavioralSummary(localInsights);
   
-  const topInsights = localInsights.slice(0, 3);
+  const topInsights = localInsights.slice(0, 5);
+
+  // Build supplementary smart observations from raw CSV trade data
+  const smartObservations = (() => {
+    if (trades.length === 0) return [];
+    const obs: { id: string; title: string; description: string; severity: 'low' | 'medium' | 'high' | 'critical'; type: string; affectedTrades: string[] }[] = [];
+    const winners = trades.filter(t => t.result > 0);
+    const losers = trades.filter(t => t.result <= 0);
+    const winRate = (winners.length / trades.length) * 100;
+    const avgRR = trades.reduce((s, t) => s + t.rr, 0) / trades.length;
+    const violations = trades.filter(t => t.ruleViolation);
+
+    // Win rate observation
+    if (winRate >= 60) {
+      obs.push({ id: 'obs-wr', type: 'setup-bias', severity: 'low', title: `Strong ${winRate.toFixed(0)}% Win Rate`, description: `You are winning ${winners.length} out of ${trades.length} trades. This puts you in the top tier of retail traders. Focus on protecting this edge.`, affectedTrades: winners.map(t => t.id) });
+    } else if (winRate < 45) {
+      obs.push({ id: 'obs-wr', type: 'setup-bias', severity: 'high', title: `Low Win Rate at ${winRate.toFixed(0)}%`, description: `Only ${winners.length} of ${trades.length} trades are profitable. Review your entry criteria and consider only trading the highest-probability setups.`, affectedTrades: losers.map(t => t.id) });
+    }
+
+    // Best performing pair
+    const pairPnL: Record<string, number> = {};
+    trades.forEach(t => { pairPnL[t.pair] = (pairPnL[t.pair] || 0) + t.result; });
+    const sorted = Object.entries(pairPnL).sort((a, b) => b[1] - a[1]);
+    if (sorted.length > 0 && sorted[0][1] > 0) {
+      obs.push({ id: 'obs-best-pair', type: 'time-pattern', severity: 'low', title: `Best Pair: ${sorted[0][0]}`, description: `${sorted[0][0]} is your most profitable instrument at $${sorted[0][1].toFixed(0)} total P&L. Double down on understanding what makes these setups work.`, affectedTrades: trades.filter(t => t.pair === sorted[0][0]).map(t => t.id) });
+    }
+    if (sorted.length > 1 && sorted[sorted.length - 1][1] < 0) {
+      const worst = sorted[sorted.length - 1];
+      obs.push({ id: 'obs-worst-pair', type: 'setup-bias', severity: 'medium', title: `Worst Pair: ${worst[0]}`, description: `${worst[0]} has cost you $${Math.abs(worst[1]).toFixed(0)} overall. Consider reducing size or pausing trading on this instrument until you identify why it underperforms.`, affectedTrades: trades.filter(t => t.pair === worst[0]).map(t => t.id) });
+    }
+
+    // Avg R:R observation
+    if (avgRR < 1.0) {
+      obs.push({ id: 'obs-rr', type: 'holding-losers', severity: 'high', title: `Average R:R Below 1.0 (${avgRR.toFixed(2)})`, description: `Your average risk-reward of ${avgRR.toFixed(2)} means losses outweigh wins on average. Even with a 60% win rate this leads to long-term losses. Aim for minimum 1.5:1.`, affectedTrades: trades.map(t => t.id) });
+    } else if (avgRR >= 2.0) {
+      obs.push({ id: 'obs-rr', type: 'time-pattern', severity: 'low', title: `Excellent Average R:R of ${avgRR.toFixed(2)}`, description: `Your average risk-reward ratio of ${avgRR.toFixed(2)} is above the professional benchmark of 2:1. This gives you a significant mathematical edge even with a sub-50% win rate.`, affectedTrades: winners.map(t => t.id) });
+    }
+
+    // Violation rate
+    if (violations.length > 0) {
+      const rate = (violations.length / trades.length * 100).toFixed(0);
+      obs.push({ id: 'obs-viol', type: 'revenge-trading', severity: violations.length >= 3 ? 'high' : 'medium', title: `Rule Violations in ${rate}% of Trades`, description: `You violated your trading rules in ${violations.length} of ${trades.length} trades. Trades with violations: ${violations.map(t => t.pair).join(', ')}. Use a pre-trade checklist to eliminate these.`, affectedTrades: violations.map(t => t.id) });
+    }
+
+    return obs;
+  })();
+
+  // Merge behavioral + smart observations, deduplicate, limit to 5
+  const allObservations = [
+    ...topInsights,
+    ...smartObservations.filter(s => !topInsights.some(t => t.id === s.id))
+  ].slice(0, 5);
 
   return (
     <Card className="glass-card border-0 shadow-lg h-full overflow-hidden">
@@ -182,40 +233,47 @@ export default function BehavioralInsights({ trades, aiInsights, isAnalyzing, on
         <div className="space-y-3">
           <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Key Observations</h4>
           <div className="space-y-3">
-            {topInsights.map((insight, i) => {
-              const sev = severityConfig[insight.severity];
-              const PatternIcon = patternIcons[insight.type] || Brain;
-              
-              return (
-                <motion.div
-                  key={insight.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1, duration: 0.3 }}
-                  className="p-4 rounded-xl border bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-all duration-200"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="shrink-0 mt-1">
-                      <PatternIcon className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <Badge className={`text-[10px] font-bold ${sev.class} border`}>
-                          {sev.label}
-                        </Badge>
-                        <span className="text-[10px] text-muted-foreground">
-                          {insight.affectedTrades.length} trades affected
-                        </span>
+            {allObservations.length === 0 ? (
+              <div className="p-4 rounded-xl border bg-card/30 text-center">
+                <Target className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
+                <p className="text-xs text-muted-foreground">No significant patterns detected yet. Upload more trades for deeper insights.</p>
+              </div>
+            ) : (
+              allObservations.map((insight, i) => {
+                const sev = severityConfig[insight.severity];
+                const PatternIcon = patternIcons[insight.type as keyof typeof patternIcons] || Brain;
+
+                return (
+                  <motion.div
+                    key={insight.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.08, duration: 0.3 }}
+                    className="p-4 rounded-xl border bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-all duration-200"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="shrink-0 mt-1">
+                        <PatternIcon className="h-4 w-4 text-muted-foreground" />
                       </div>
-                      <h5 className="text-sm font-bold mb-1">{insight.title}</h5>
-                      <p className="text-xs text-muted-foreground leading-relaxed mb-2">
-                        {insight.description}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <Badge className={`text-[10px] font-bold ${sev.class} border`}>
+                            {sev.label}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground">
+                            {insight.affectedTrades.length} trade{insight.affectedTrades.length !== 1 ? 's' : ''} affected
+                          </span>
+                        </div>
+                        <h5 className="text-sm font-bold mb-1">{insight.title}</h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {insight.description}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+                  </motion.div>
+                );
+              })
+            )}
           </div>
         </div>
 

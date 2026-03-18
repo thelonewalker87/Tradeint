@@ -122,7 +122,47 @@ export const AIApiService = {
   mapCSVToTradeObject(csv: CSVTradeData): any {
     const entryDate = new Date(csv.date);
     const exitDate = new Date(csv.date);
-    
+
+    // Detect emotional state from rule violations first, then from notes
+    const violation = (csv.ruleViolation || '').toLowerCase();
+    const notes = (csv.notes || '').toLowerCase();
+    let emotionalState: 'calm' | 'fearful' | 'greedy' | 'revenge' | 'overconfident' = 'calm';
+
+    if (violation.includes('revenge') || notes.includes('revenge')) {
+      emotionalState = 'revenge';
+    } else if (violation.includes('oversize') || violation.includes('oversized') || notes.includes('greedy') || notes.includes('overconfi')) {
+      emotionalState = 'greedy';
+    } else if (violation.includes('news') || notes.includes('fomo') || notes.includes('scared') || notes.includes('fear')) {
+      emotionalState = 'fearful';
+    } else if (violation.includes('no stop') || violation.includes('stop loss')) {
+      emotionalState = 'greedy'; // trading without a stop = overconfident/greedy
+    } else if (notes.includes('revenge')) {
+      emotionalState = 'revenge';
+    }
+
+    // Determine rule violations with proper severity
+    const ruleViolations: { type: string; severity: string; description: string }[] = [];
+    if (csv.ruleViolation) {
+      const vl = csv.ruleViolation.toLowerCase();
+      let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+      let type: string = 'position-size';
+
+      if (vl.includes('revenge')) { type = 'revenge'; severity = 'critical'; }
+      else if (vl.includes('no stop') || vl.includes('stop loss')) { type = 'no-stop-loss'; severity = 'critical'; }
+      else if (vl.includes('oversize') || vl.includes('oversized')) { type = 'position-size'; severity = 'high'; }
+      else if (vl.includes('news')) { type = 'overtrading'; severity = 'medium'; }
+
+      ruleViolations.push({ type, severity, description: csv.ruleViolation });
+    }
+
+    // Map notes to setup type
+    let setupType: 'breakout' | 'pullback' | 'reversal' = 'reversal';
+    if (notes.includes('breakout')) setupType = 'breakout';
+    else if (notes.includes('pullback') || notes.includes('continuation')) setupType = 'pullback';
+
+    // Map session field to a valid union value
+    const session: 'london' | 'new-york' | 'tokyo' | 'sydney' | 'overlap' = 'london';
+
     return {
       tradeId: csv.id,
       symbol: csv.pair,
@@ -134,17 +174,16 @@ export const AIApiService = {
       profitLoss: csv.result,
       riskReward: csv.rr,
       direction: csv.direction,
-      setupType: (csv.notes?.toLowerCase().includes('breakout') ? 'breakout' : 
-                  csv.notes?.toLowerCase().includes('pullback') ? 'pullback' : 'reversal'),
-      ruleViolations: csv.ruleViolation ? [{
-        type: 'position-size',
-        severity: 'medium',
-        description: csv.ruleViolation
-      }] : [],
-      emotionalState: (csv.notes?.toLowerCase().includes('revenge') ? 'revenge' :
-                      csv.notes?.toLowerCase().includes('greedy') ? 'greedy' :
-                      csv.notes?.toLowerCase().includes('fomo') ? 'fearful' : 'calm'),
-      holdingTime: 60, // Default to 60m if unknown
+      setupType,
+      session,
+      ruleViolations,
+      emotionalState,
+      holdingTime: 60,
+      maxDrawdown: 0,
+      maxProfit: 0,
+      exitReason: 'manual' as const,
+      commission: 0,
+      swap: 0,
       tags: csv.notes ? [csv.notes] : [],
       notes: csv.notes || ''
     };
