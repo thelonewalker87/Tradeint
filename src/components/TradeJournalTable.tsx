@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronLeft, ChevronRight, Play, AlertTriangle } from 'lucide-react';
 import { CSVTradeData } from '@/csvManager';
@@ -15,18 +15,55 @@ export default function TradeJournalTable({ trades, isLoading = false }: TradeJo
   const [search, setSearch] = useState('');
   const [filterOutcome, setFilterOutcome] = useState<'all' | 'win' | 'loss'>('all');
   const [page, setPage] = useState(1);
+  const [pageInput, setPageInput] = useState('1');
   const [replayTrade, setReplayTrade] = useState<CSVTradeData | null>(null);
 
+  useEffect(() => {
+    setPageInput(String(page));
+  }, [page]);
+
+  // Reset to first page when trade list changes so newly added trades appear immediately
+  useEffect(() => {
+    setPage(1);
+  }, [trades.length]);
+
+
+  const sortedTrades = useMemo(() => {
+    return [...trades].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [trades]);
+
   const filtered = useMemo(() => {
-    return trades.filter(t => {
+    return sortedTrades.filter(t => {
       const matchSearch = t.pair.toLowerCase().includes(search.toLowerCase()) || t.id.toLowerCase().includes(search.toLowerCase());
       const matchFilter = filterOutcome === 'all' || (t.result >= 0 ? 'win' : 'loss') === filterOutcome;
       return matchSearch && matchFilter;
     });
-  }, [trades, search, filterOutcome]);
+  }, [sortedTrades, search, filterOutcome]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const handlePageInputChange = (value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    setPageInput(value);
+    const num = Number(value);
+    if (value !== '' && num >= 1 && num <= totalPages) {
+      setPage(num);
+    }
+  };
+
+  const handlePageInputBlur = () => {
+    const parsed = parseInt(pageInput, 10);
+    const normalized = isNaN(parsed) ? page : Math.min(Math.max(parsed, 1), totalPages);
+    setPage(normalized);
+    setPageInput(String(normalized));
+  };
 
   return (
     <>
@@ -117,11 +154,25 @@ export default function TradeJournalTable({ trades, isLoading = false }: TradeJo
         {/* Pagination */}
         <div className="flex items-center justify-between mt-4">
           <span className="text-xs text-muted-foreground">{filtered.length} trade{filtered.length !== 1 ? 's' : ''}</span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg hover:bg-secondary disabled:opacity-30 transition-all">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-xs font-medium px-2">{page}/{totalPages}</span>
+
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">Page</label>
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={pageInput}
+                onChange={(e) => handlePageInputChange(e.target.value)}
+                onBlur={handlePageInputBlur}
+                className="w-14 h-8 text-sm text-center rounded-lg bg-secondary border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              <span className="text-xs text-muted-foreground">of {totalPages}</span>
+            </div>
+
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded-lg hover:bg-secondary disabled:opacity-30 transition-all">
               <ChevronRight className="w-4 h-4" />
             </button>

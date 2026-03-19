@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import AppSidebar from '@/components/AppSidebar';
-import { Menu, X } from 'lucide-react';
+import { Menu } from 'lucide-react';
 
 function cn(...classes: (string | undefined | null | false)[]) {
   return classes.filter(Boolean).join(' ');
@@ -58,124 +58,116 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [collapsed, isMobile]);
 
   return (
-    <div className="flex min-h-screen bg-background overflow-hidden">
-      {/* Enhanced Mobile overlay */}
+    <div className="flex min-h-screen bg-background">
+
+      {/* ────────────────────────────────────────────
+          MOBILE: backdrop overlay when drawer is open
+          ──────────────────────────────────────────── */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
+            key="mobile-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="fixed inset-0 bg-background/90 backdrop-blur-md z-40 lg:hidden"
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 bg-background/85 backdrop-blur-md z-40 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
       </AnimatePresence>
 
-      {/* Enhanced Sidebar with better animations */}
-      <motion.div 
+      {/* ────────────────────────────────────────────
+          MOBILE: fixed slide-in drawer
+          ──────────────────────────────────────────── */}
+      <div
         className={cn(
-          "fixed lg:sticky top-0 h-screen z-50 transition-all duration-500 ease-out",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full",
-          "lg:translate-x-0",
-          collapsed ? "lg:w-20" : "lg:w-72",
-          "w-72"
+          'fixed top-0 left-0 h-screen w-72 z-50 transition-transform duration-300 ease-out lg:hidden',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
-        initial={false}
-        animate={{
-          x: sidebarOpen ? 0 : (isMobile ? -288 : 0),
-          width: isMobile ? 288 : (collapsed ? 80 : 288)
-        }}
-        transition={{
-          type: "spring",
-          stiffness: 400,
-          damping: 30,
-          mass: 0.8
-        }}
       >
-        <AppSidebar 
-          collapsed={isMobile ? false : collapsed} 
-          onToggleCollapse={() => !isMobile && setCollapsed(!collapsed)} 
-          onClose={() => setSidebarOpen(false)} 
+        <AppSidebar
+          collapsed={false}
+          onToggleCollapse={() => {}}
+          onClose={() => setSidebarOpen(false)}
         />
-      </motion.div>
+      </div>
 
-      {/* Enhanced Main Content */}
-      <motion.div 
+      {/* ────────────────────────────────────────────
+          DESKTOP: sidebar is a FLEX SIBLING
+          → never overlaps the content area
+          Width animates between 80px (collapsed)
+          and 288px (expanded) via CSS transition.
+          ──────────────────────────────────────────── */}
+      <div
         className={cn(
-          "flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-500 ease-out",
-          "lg:transition-none"
+          'hidden lg:block flex-shrink-0 transition-all duration-300 ease-out',
+          collapsed ? 'w-20' : 'w-72'
         )}
-        animate={{
-          marginLeft: isMobile ? 0 : (collapsed ? 0 : 0),
-          width: isMobile ? "100%" : (collapsed ? "calc(100% - 80px)" : "calc(100% - 288px)")
-        }}
-        transition={{
-          type: "spring",
-          stiffness: 400,
-          damping: 30,
-          mass: 0.8
-        }}
       >
-        {/* Enhanced Mobile header */}
-        <motion.div 
-          className="lg:hidden sticky top-0 z-30 h-16 safe-area-top flex items-center gap-4 px-6 border-b border-border/20 bg-card/90 backdrop-blur-xl"
+        {/* sticky so it stays in view while content scrolls */}
+        <div className="sticky top-0 h-screen">
+          <AppSidebar
+            collapsed={collapsed}
+            onToggleCollapse={() => setCollapsed(prev => !prev)}
+            onClose={() => {}}
+          />
+        </div>
+      </div>
+
+      {/* ────────────────────────────────────────────
+          MAIN CONTENT
+          flex-1 automatically fills the remaining
+          width — content always stays to the right
+          of the sidebar.
+          ──────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        {/* Mobile top header */}
+        <motion.div
+          className="lg:hidden sticky top-0 z-30 h-16 flex items-center gap-4 px-6 border-b border-border/20 bg-card/90 backdrop-blur-xl"
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
         >
-          <motion.button 
-            onClick={() => setSidebarOpen(true)} 
-            className="p-3 rounded-2xl hover:bg-primary/10 transition-all duration-300 touch-manipulation border border-border/20 hover:border-primary/30 group"
+          <motion.button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2.5 rounded-xl hover:bg-primary/10 transition-all duration-200 border border-border/20 hover:border-primary/30 group"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             aria-label="Open sidebar"
           >
             <Menu className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
           </motion.button>
-          <motion.span 
+          <motion.span
             className="font-bold text-lg bg-gradient-to-r from-foreground to-primary/80 bg-clip-text text-transparent"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
           >
             Tradient
           </motion.span>
         </motion.div>
 
-        {/* Enhanced Page Content */}
-        <motion.main 
-          className="flex-1 overflow-y-auto safe-area-bottom"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          <motion.div 
-            className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
+        {/* Page content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
-                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                initial={{ opacity: 0, y: 16, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                transition={{ 
-                  duration: 0.4, 
-                  ease: [0.4, 0, 0.2, 1],
-                  staggerChildren: 0.1
-                }}
+                exit={{ opacity: 0, y: -16, scale: 0.98 }}
+                transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
                 className="w-full"
               >
                 {children}
               </motion.div>
             </AnimatePresence>
-          </motion.div>
-        </motion.main>
-      </motion.div>
+          </div>
+        </main>
+
+      </div>
     </div>
   );
 }

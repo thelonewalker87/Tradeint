@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  ReferenceLine, Cell
+  ReferenceLine, Cell, Legend
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, Target, Activity, DollarSign, 
@@ -214,35 +214,73 @@ export default function AnalyticsPage() {
       .slice(-30); // Last 30 days
   }, [trades]);
 
-  // Long vs Short analysis
+  // Long vs Short analysis — multi-metric data for grouped bar chart
   const longShortData = useMemo(() => {
-    if (trades.length === 0) {
-      return [];
-    }
+    if (trades.length === 0) return [];
 
     const longTrades = trades.filter(t => t.direction === 'long');
     const shortTrades = trades.filter(t => t.direction === 'short');
-    
+
     const longPnL = longTrades.reduce((sum, t) => sum + (t.result || 0), 0);
     const shortPnL = shortTrades.reduce((sum, t) => sum + (t.result || 0), 0);
-    
+
+    const longWR = longTrades.length > 0
+      ? Math.round((longTrades.filter(t => (t.result || 0) > 0).length / longTrades.length) * 100)
+      : 0;
+    const shortWR = shortTrades.length > 0
+      ? Math.round((shortTrades.filter(t => (t.result || 0) > 0).length / shortTrades.length) * 100)
+      : 0;
+
+    const longAvg = longTrades.length > 0 ? Math.round((longPnL / longTrades.length) * 100) / 100 : 0;
+    const shortAvg = shortTrades.length > 0 ? Math.round((shortPnL / shortTrades.length) * 100) / 100 : 0;
+
+    // Return one row per metric so we can use grouped bars
+    return [
+      {
+        metric: 'Trade Count',
+        LONG: longTrades.length,
+        SHORT: shortTrades.length,
+      },
+      {
+        metric: 'Win Rate %',
+        LONG: longWR,
+        SHORT: shortWR,
+      },
+      {
+        metric: 'Total P&L',
+        LONG: Math.round(longPnL * 100) / 100,
+        SHORT: Math.round(shortPnL * 100) / 100,
+      },
+      {
+        metric: 'Avg Return',
+        LONG: longAvg,
+        SHORT: shortAvg,
+      },
+    ];
+  }, [trades]);
+
+  // Summary cards (separate, used below the chart)
+  const longShortSummary = useMemo(() => {
+    if (trades.length === 0) return [];
+    const longTrades = trades.filter(t => t.direction === 'long');
+    const shortTrades = trades.filter(t => t.direction === 'short');
+    const longPnL = longTrades.reduce((sum, t) => sum + (t.result || 0), 0);
+    const shortPnL = shortTrades.reduce((sum, t) => sum + (t.result || 0), 0);
     return [
       {
         type: 'LONG',
         trades: longTrades.length,
         winRate: longTrades.length > 0 ? Math.round((longTrades.filter(t => (t.result || 0) > 0).length / longTrades.length) * 100) : 0,
-        avgReturn: longTrades.length > 0 ? Math.round((longPnL / longTrades.length) * 100) / 100 : 0,
         totalPnL: Math.round(longPnL * 100) / 100,
-        color: '#10b981'
+        color: '#10b981',
       },
       {
         type: 'SHORT',
         trades: shortTrades.length,
         winRate: shortTrades.length > 0 ? Math.round((shortTrades.filter(t => (t.result || 0) > 0).length / shortTrades.length) * 100) : 0,
-        avgReturn: shortTrades.length > 0 ? Math.round((shortPnL / shortTrades.length) * 100) / 100 : 0,
         totalPnL: Math.round(shortPnL * 100) / 100,
-        color: '#ef4444'
-      }
+        color: '#ef4444',
+      },
     ];
   }, [trades]);
 
@@ -422,7 +460,7 @@ export default function AnalyticsPage() {
 
         {/* Bottom Section - IMPROVED */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Long vs Short Analysis - IMPROVED */}
+          {/* Long vs Short Analysis — Grouped Bar Chart */}
           <Card className="glass-card">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2">
@@ -433,61 +471,95 @@ export default function AnalyticsPage() {
             <CardContent>
               {longShortData.length > 0 ? (
                 <>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={longShortData}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart
+                      data={longShortData}
+                      margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
+                      barCategoryGap="28%"
+                      barGap={4}
+                    >
                       <defs>
-                        <linearGradient id="longGradient" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="lgBarLong" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#10b981" stopOpacity={1}/>
-                          <stop offset="100%" stopColor="#10b981" stopOpacity={0.6}/>
+                          <stop offset="100%" stopColor="#10b981" stopOpacity={0.55}/>
                         </linearGradient>
-                        <linearGradient id="shortGradient" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="lgBarShort" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#ef4444" stopOpacity={1}/>
-                          <stop offset="100%" stopColor="#ef4444" stopOpacity={0.6}/>
+                          <stop offset="100%" stopColor="#ef4444" stopOpacity={0.55}/>
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="type" stroke="hsl(var(--muted-foreground))" />
-                      <YAxis 
-                        stroke="hsl(var(--muted-foreground))" 
-                        domain={['auto', 'auto']}
-                        tickFormatter={(value) => `$${Math.abs(value).toFixed(0)}`}
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis
+                        dataKey="metric"
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
                       />
-                      <Tooltip 
+                      <YAxis
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        width={50}
+                        tickFormatter={(v) => {
+                          if (Math.abs(v) >= 1000) return `$${(v / 1000).toFixed(1)}k`;
+                          return String(v);
+                        }}
+                      />
+                      <Tooltip
                         contentStyle={{
                           backgroundColor: 'hsl(var(--card))',
                           border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px'
+                          borderRadius: '10px',
+                          fontSize: 13,
                         }}
-                        formatter={(value: number, name: string) => {
-                          if (name === 'totalPnL') {
-                            return [`$${value.toFixed(2)}`, 'Total P&L'];
-                          }
+                        formatter={(value: number, name: string, props) => {
+                          const metric = props?.payload?.metric as string;
+                          if (metric === 'Win Rate %') return [`${value}%`, name];
+                          if (metric === 'Total P&L' || metric === 'Avg Return') return [`$${value.toFixed(2)}`, name];
                           return [value, name];
                         }}
+                        cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
                       />
-                      <Bar dataKey="totalPnL" radius={[8, 8, 0, 0]}>
-                        {longShortData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={`url(${entry.type === 'LONG' ? 'longGradient' : 'shortGradient'})`} />
-                        ))}
-                      </Bar>
+                      <Legend
+                        wrapperStyle={{ paddingTop: '12px', fontSize: 13 }}
+                        iconType="circle"
+                        iconSize={10}
+                        formatter={(value) => (
+                          <span style={{ color: 'hsl(var(--foreground))', fontWeight: 500 }}>{value}</span>
+                        )}
+                      />
+                      <Bar dataKey="LONG" fill="url(#lgBarLong)" radius={[6, 6, 0, 0]} maxBarSize={56} />
+                      <Bar dataKey="SHORT" fill="url(#lgBarShort)" radius={[6, 6, 0, 0]} maxBarSize={56} />
                     </BarChart>
                   </ResponsiveContainer>
-                  
-                  <div className="grid grid-cols-2 gap-4 mt-6">
-                    {longShortData.map((data) => (
-                      <div key={data.type} className="p-3 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-lg">
+
+                  {/* Summary cards */}
+                  <div className="grid grid-cols-2 gap-4 mt-5">
+                    {longShortSummary.map((data) => (
+                      <div
+                        key={data.type}
+                        className="p-3 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-xl border border-border/40"
+                      >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold text-sm">{data.type}</span>
+                          <span
+                            className="font-bold text-sm px-2 py-0.5 rounded-md text-white"
+                            style={{ backgroundColor: data.color }}
+                          >
+                            {data.type}
+                          </span>
                           <Badge variant="outline" className="text-xs">
                             {data.trades} trades
                           </Badge>
                         </div>
                         <div className="space-y-1">
                           <div className="text-xs text-muted-foreground">
-                            Win Rate: <span className="font-medium text-foreground">{data.winRate.toFixed(1)}%</span>
+                            Win Rate: <span className="font-semibold text-foreground">{data.winRate}%</span>
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            P&L: <span className={`font-medium ${data.totalPnL >= 0 ? 'text-success' : 'text-destructive'}`}>
+                            Total P&L:{' '}
+                            <span className={`font-semibold ${data.totalPnL >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
                               ${data.totalPnL.toFixed(2)}
                             </span>
                           </div>

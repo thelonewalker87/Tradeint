@@ -150,7 +150,8 @@ class CSVManager {
 
   static addTradeToCSV(trade: CSVTradeData): void {
     const existingTrades = this.loadFromLocalStorage();
-    const updatedTrades = [...existingTrades, trade];
+    // Add new trades at the beginning so the most recent trades show first
+    const updatedTrades = [trade, ...existingTrades];
     this.saveToLocalStorage(updatedTrades);
   }
 

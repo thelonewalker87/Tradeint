@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileText, CheckCircle, X, AlertCircle, Loader2, Database, Trash2, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +42,24 @@ interface DataSummary {
   directions: string[];
 }
 
+const IMPORTED_FILES_KEY = 'tradient_imported_filenames';
+
+function getImportedFilenames(): Set<string> {
+  try {
+    const raw = localStorage.getItem(IMPORTED_FILES_KEY);
+    if (raw) return new Set(JSON.parse(raw));
+  } catch { /* ignore */ }
+  return new Set();
+}
+
+function saveImportedFilename(filename: string): void {
+  try {
+    const existing = getImportedFilenames();
+    existing.add(filename);
+    localStorage.setItem(IMPORTED_FILES_KEY, JSON.stringify([...existing]));
+  } catch { /* ignore */ }
+}
+
 export default function EnhancedCSVUpload() {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -51,6 +69,9 @@ export default function EnhancedCSVUpload() {
   const [parsedData, setParsedData] = useState<ParsedTrade[]>([]);
   const [activeTab, setActiveTab] = useState('upload');
   const [dataSummary, setDataSummary] = useState<DataSummary | null>(null);
+  const [hasImported, setHasImported] = useState(false);
+  const [isDuplicateFile, setIsDuplicateFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const MAX_VALIDATION_MESSAGES = 50;
 
@@ -230,7 +251,7 @@ export default function EnhancedCSVUpload() {
     };
   }, []);
 
-  const handleFileSelect = useCallback((selectedFile: File) => {
+  const handleFileSelect = useCallback((selectedFile: File, forceImport = false) => {
     if (selectedFile && selectedFile.type !== 'text/csv' && !selectedFile.name.endsWith('.csv')) {
       setValidationResult({
         isValid: false,
@@ -241,6 +262,11 @@ export default function EnhancedCSVUpload() {
       });
       return;
     }
+
+    // Check for duplicate filename
+    const importedNames = getImportedFilenames();
+    const isDup = importedNames.has(selectedFile.name);
+    setIsDuplicateFile(isDup && !forceImport);
 
     setFile(selectedFile);
     setValidationResult(null);
@@ -286,7 +312,7 @@ export default function EnhancedCSVUpload() {
         skipEmptyLines: true,
         complete: (results) => {
           setUploadProgress(40);
-          
+
           // First pass: Convert utilizing heuristic mapping algorithm
           const trades = convertToTrades(results.data);
 
@@ -302,29 +328,40 @@ export default function EnhancedCSVUpload() {
               const summary = generateDataSummary(trades);
               setDataSummary(summary);
             }
-            
+
             setUploadProgress(80);
 
             // Yield again before safely saving
             setTimeout(() => {
               if (validation.isValid) {
                 const existingTrades = CSVManager.loadFromLocalStorage();
-                
+
                 // Avoid replacing or duplicating existing trades. Prevent ID clashes:
                 const existingIds = new Set(existingTrades.map(t => t.id));
                 const newUniqueTrades = trades.filter(t => !existingIds.has(t.id));
 
-                const mergedTrades = [...existingTrades, ...newUniqueTrades];
-                
+                // New trades should appear first (newest first)
+                const mergedTrades = [...newUniqueTrades, ...existingTrades]
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
                 // Save — CSVManager seamlessly dispatches the 'tradesUpdated' event
                 CSVManager.saveToLocalStorage(mergedTrades);
-                
+                // Track this filename so we can warn on re-import
+                if (file) saveImportedFilename(file.name);
+                setHasImported(true);
+                setIsDuplicateFile(false);
+                setFile(null);
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
+                setParsedData([]);
+
                 setValidationResult({
                   isValid: true,
                   errors: [],
-                  warnings: [`Successfully appended ${newUniqueTrades.length} new trades (${mergedTrades.length} total stored)`],
+                  warnings: [`Successfully imported ${newUniqueTrades.length} new trades (${mergedTrades.length} total stored)`],
                   rowCount: newUniqueTrades.length,
-                  duplicates: trades.length - newUniqueTrades.length
+                  duplicates: trades.length - newUniqueTrades.length,
                 });
               }
 
@@ -360,11 +397,16 @@ export default function EnhancedCSVUpload() {
 
   const resetUpload = useCallback(() => {
     setFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     setValidationResult(null);
     setParsedData([]);
     setDataSummary(null);
     setUploadProgress(0);
     setIsUploading(false);
+    setHasImported(false);
+    setIsDuplicateFile(false);
   }, []);
 
   const clearUploadedData = useCallback(() => {
@@ -416,50 +458,106 @@ export default function EnhancedCSVUpload() {
 
           {/* Upload Tab */}
           <TabsContent value="upload" className="space-y-6 mt-4">
-            {/* Upload Area */}
-            <div
-              className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
-                isDragging 
-                  ? 'border-primary bg-primary/5 scale-[1.02]' 
-                  : 'border-muted-foreground/20 hover:border-primary/50 hover:bg-muted/10'
-              }`}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-            >
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                disabled={isUploading}
-              />
-              
-              <div className="space-y-4">
-                <motion.div
-                  animate={{ scale: isDragging ? 1.1 : 1 }}
-                  className="mx-auto w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center"
-                >
-                  <FileText className="h-8 w-8 text-primary" />
-                </motion.div>
-                
-                <div className="space-y-2">
-                  <h4 className="text-lg font-semibold">
-                    {file ? file.name : 'Drop your CSV file here'}
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    {file 
-                      ? `Size: ${(file.size / 1024).toFixed(1)} KB` 
-                      : 'or click to browse'
-                    }
-                  </p>
+            {hasImported ? (
+              <div className="p-8 rounded-xl bg-success/10 border border-success/20 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <CheckCircle className="h-10 w-10 text-success" />
+                  <h4 className="text-lg font-semibold">Import complete</h4>
+                  <p className="text-sm text-muted-foreground">Your CSV has been imported and your trades are now available in the dashboard and journal.</p>
+                  <Button onClick={resetUpload} className="mt-2">
+                    Import another file
+                  </Button>
                 </div>
               </div>
-            </div>
+            ) : (
+              <>
+                {/* Upload Area */}
+                <div
+                  className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
+                    isDragging 
+                      ? 'border-primary bg-primary/5 scale-[1.02]' 
+                      : 'border-muted-foreground/20 hover:border-primary/50 hover:bg-muted/10'
+                  }`}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                >
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    disabled={isUploading}
+                  />
+                  
+                  <div className="space-y-4">
+                    <motion.div
+                      animate={{ scale: isDragging ? 1.1 : 1 }}
+                      className="mx-auto w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center"
+                    >
+                      <FileText className="h-8 w-8 text-primary" />
+                    </motion.div>
+                    
+                    <div className="space-y-2">
+                      <h4 className="text-lg font-semibold">
+                        {file ? file.name : 'Drop your CSV file here'}
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        {file 
+                          ? `Size: ${(file.size / 1024).toFixed(1)} KB` 
+                          : 'or click to browse'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Duplicate File Warning */}
+            <AnimatePresence>
+              {file && isDuplicateFile && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg"
+                >
+                  <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm">
+                      This file was already imported
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                      <span className="font-mono font-medium">{file.name}</span> has been imported before. Importing again may create duplicates (existing trade IDs will be skipped).
+                    </p>
+                    <div className="flex items-center gap-2 mt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300"
+                        onClick={() => handleFileSelect(file, true)}
+                        disabled={isUploading}
+                      >
+                        Import Anyway
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={resetUpload}
+                        disabled={isUploading}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* File Actions */}
             <AnimatePresence>
-              {file && (
+              {file && !isDuplicateFile && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -502,6 +600,7 @@ export default function EnhancedCSVUpload() {
                     >
                       <X className="h-4 w-4" />
                     </Button>
+
                   </div>
                 </motion.div>
               )}

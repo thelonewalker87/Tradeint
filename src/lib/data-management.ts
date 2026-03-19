@@ -30,7 +30,8 @@ export const dataManager = {
   // Add single trade (for manual entry)
   addTrade(trade: CSVTradeData) {
     if (isUsingUploadedData) {
-      uploadedTrades.push(trade);
+      // Add new trades at the beginning so latest trades show first
+      uploadedTrades.unshift(trade);
     }
   },
 

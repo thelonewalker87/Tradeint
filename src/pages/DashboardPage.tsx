@@ -30,7 +30,8 @@ export default function DashboardPage() {
         CSVManager.saveToLocalStorage(sampleTrades);
         setCurrentTrades(sampleTrades);
       } else {
-        setCurrentTrades(csvTrades);
+        // Ensure newest trades appear first
+        setCurrentTrades(csvTrades.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       }
     } catch (error) {
       console.error('Error loading trades:', error);

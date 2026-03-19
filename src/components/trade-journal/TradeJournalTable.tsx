@@ -190,6 +190,9 @@ export default function TradeJournalTable() {
   const filteredTrades = useMemo(() => {
     let trades = dataManager.getTrades();
 
+    // Ensure newest trades are first (descending by date)
+    trades = trades.slice().sort((a, b) => new Date(b.entryTime).getTime() - new Date(a.entryTime).getTime());
+
     // Apply search filter
     if (searchTerm) {
       trades = trades.filter(trade =>
