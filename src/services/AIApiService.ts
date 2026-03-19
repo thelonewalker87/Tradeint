@@ -24,6 +24,7 @@ export interface DimensionScore {
 export interface GradeResult {
   overall_score: number;
   letter_grade: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metrics: any;
   entry_quality: DimensionScore;
   risk_management: DimensionScore;
@@ -119,6 +120,7 @@ export const AIApiService = {
   /**
    * Helper to map CSVTradeData to the internal 'Trade' type for local TS logic
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mapCSVToTradeObject(csv: CSVTradeData): any {
     const entryDate = new Date(csv.date);
     const exitDate = new Date(csv.date);
@@ -136,8 +138,6 @@ export const AIApiService = {
       emotionalState = 'fearful';
     } else if (violation.includes('no stop') || violation.includes('stop loss')) {
       emotionalState = 'greedy'; // trading without a stop = overconfident/greedy
-    } else if (notes.includes('revenge')) {
-      emotionalState = 'revenge';
     }
 
     // Determine rule violations with proper severity

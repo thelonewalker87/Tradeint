@@ -131,6 +131,7 @@ export default function EnhancedCSVUpload() {
   }, []);
 
   /** Convert and heuristically map any CSV format to typed trades */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const convertToTrades = useCallback((data: any[]): CSVTradeData[] => {
     const KEYWORD_MAP = {
       date: ['date', 'time', 'opened', 'open_time', 'opentime', 'datetime', 'timestamp'],
@@ -150,6 +151,7 @@ export default function EnhancedCSVUpload() {
     let lastSize = 0.01;
 
     return data.map((rawRow, index) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const normalized: any = {};
       const rawKeys = Object.keys(rawRow);
       
@@ -164,17 +166,18 @@ export default function EnhancedCSVUpload() {
       }
 
       // Cleanup Strings mapped to Numbers
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cleanNum = (val: any) => {
         if (val === undefined || val === null || val === '') return null;
         const cleaned = val.toString().replace(/[^0-9.-]/g, '');
         return cleaned ? parseFloat(cleaned) : null;
       };
 
-      let entry = cleanNum(normalized.entry) || 0;
-      let exit = cleanNum(normalized.exit) || 0;
-      let result = cleanNum(normalized.result) || 0;
+      const entry = cleanNum(normalized.entry) || 0;
+      const exit = cleanNum(normalized.exit) || 0;
+      const result = cleanNum(normalized.result) || 0;
       let positionSize = cleanNum(normalized.positionSize);
-      let rr = cleanNum(normalized.rr) || 0;
+      const rr = cleanNum(normalized.rr) || 0;
 
       // Infer Direction if missing
       let direction = 'long';
@@ -189,7 +192,7 @@ export default function EnhancedCSVUpload() {
       }
 
       // Date Fallbacks
-      let dateStr = normalized.date?.toString() || '';
+      const dateStr = normalized.date?.toString() || '';
       const dateMatch = dateStr.match(/\d{4}-\d{2}-\d{2}/);
       if (dateMatch) {
          lastDate = dateMatch[0];
@@ -334,20 +337,16 @@ export default function EnhancedCSVUpload() {
             // Yield again before safely saving
             setTimeout(() => {
               if (validation.isValid) {
+                // Merge with existing trades — new unique trades are added on top
                 const existingTrades = CSVManager.loadFromLocalStorage();
-
-                // Avoid replacing or duplicating existing trades. Prevent ID clashes:
                 const existingIds = new Set(existingTrades.map(t => t.id));
                 const newUniqueTrades = trades.filter(t => !existingIds.has(t.id));
 
-                // New trades should appear first (newest first)
                 const mergedTrades = [...newUniqueTrades, ...existingTrades]
                   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-                // Save — CSVManager seamlessly dispatches the 'tradesUpdated' event
                 CSVManager.saveToLocalStorage(mergedTrades);
-                // Track this filename so we can warn on re-import
-                if (file) saveImportedFilename(file.name);
+
                 setHasImported(true);
                 setIsDuplicateFile(false);
                 setFile(null);
@@ -356,10 +355,14 @@ export default function EnhancedCSVUpload() {
                 }
                 setParsedData([]);
 
+                const msg = existingTrades.length === 0
+                  ? `Successfully imported ${newUniqueTrades.length} trades.`
+                  : `Added ${newUniqueTrades.length} new trades (${mergedTrades.length} total).`;
+
                 setValidationResult({
                   isValid: true,
                   errors: [],
-                  warnings: [`Successfully imported ${newUniqueTrades.length} new trades (${mergedTrades.length} total stored)`],
+                  warnings: [msg],
                   rowCount: newUniqueTrades.length,
                   duplicates: trades.length - newUniqueTrades.length,
                 });

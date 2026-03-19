@@ -98,6 +98,7 @@ class NewsService {
         if (data.status === 'ok' && data.items) {
           const category = this.determineCategory(RSS_FEEDS[index]);
           
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           data.items.forEach((item: any) => {
             // Check if we already have this news item
             const exists = this.news.find(n => n.url === item.link || n.title === item.title);
