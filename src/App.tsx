@@ -12,6 +12,7 @@ import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import DashboardPage from "@/pages/DashboardPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import JournalPage from "@/pages/JournalPage";
+import CSVUploadPage from "@/pages/CSVUploadPage";
 import NewsPage from "@/pages/NewsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "@/pages/NotFound";
@@ -32,12 +33,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 const App = () => (
-  <ThemeProvider
-    attribute="class"
-    defaultTheme="system"
-    enableSystem
-    disableTransitionOnChange
-  >
+  <ThemeProvider defaultTheme="system">
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
@@ -52,6 +48,7 @@ const App = () => (
               <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
               <Route path="/journal" element={<ProtectedRoute><JournalPage /></ProtectedRoute>} />
+              <Route path="/csv-upload" element={<ProtectedRoute><CSVUploadPage /></ProtectedRoute>} />
               <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
