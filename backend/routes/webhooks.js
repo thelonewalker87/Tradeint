@@ -4,6 +4,15 @@ const User = require('../models/User');
 const Trade = require('../models/Trade');
 
 /**
+ * @route   GET /api/webhooks/mt5
+ * @desc    Check if webhook endpoint is active
+ * @access  Public
+ */
+router.get('/mt5', (req, res) => {
+  res.json({ status: 'active', message: 'Tradient MT5 Webhook is online. Use POST to sync trades.' });
+});
+
+/**
  * @route   POST /api/webhooks/mt5
  * @desc    Receive trade data from MT5 Expert Advisor
  * @access  Public (Token-based)
