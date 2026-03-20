@@ -12,6 +12,7 @@ import {
   Home,
   Activity,
   Upload,
+  Terminal,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +54,13 @@ const navigation = [
     icon: Newspaper,
     description: 'Market updates',
     badge: '3',
+  },
+  { 
+    name: 'Link MT5', 
+    href: '/link-mt5', 
+    icon: Terminal,
+    description: 'Auto-sync trades',
+    badge: 'NEW',
   },
   { 
     name: 'Settings', 

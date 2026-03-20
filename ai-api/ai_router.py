@@ -11,7 +11,22 @@ from openai import OpenAI
 from grader import grade_trade
 from models import TradeInput
 
-load_dotenv()
+from pathlib import Path
+
+# Robust env loading
+dotenv_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=dotenv_path)
+
+api_key = os.environ.get("OPENROUTER_API_KEY")
+if not api_key:
+    # Try as the standard OpenAI key name too 
+    api_key = os.environ.get("OPENAI_API_KEY")
+
+if not api_key:
+    print("WARNING: OPENROUTER_API_KEY or OPENAI_API_KEY not found in environment!")
+    # We set a placeholder to prevent OpenAI library from crashing on init
+    # It will still fail on actual requests, but the app will at least start.
+    api_key = "MISSING_KEY"
 
 router = APIRouter(prefix="/ai")
 
@@ -19,7 +34,7 @@ MODEL = "openrouter/free"
 
 client = OpenAI(
     base_url = "https://openrouter.ai/api/v1",
-    api_key  = os.environ.get("OPENROUTER_API_KEY"),
+    api_key  = api_key,
 )
 
 

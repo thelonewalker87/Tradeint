@@ -127,9 +127,13 @@ class CSVManager {
   static async saveToAPI(trades: CSVTradeData[]): Promise<void> {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const authToken = localStorage.getItem('tradient_auth_token');
       const response = await fetch(`${apiUrl}/api/trades/upload`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
         body: JSON.stringify(trades)
       });
       if (!response.ok) throw new Error('Failed to upload trades to API');
@@ -149,7 +153,12 @@ class CSVManager {
   static async loadFromAPI(): Promise<CSVTradeData[]> {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/trades`);
+      const authToken = localStorage.getItem('tradient_auth_token');
+      const response = await fetch(`${apiUrl}/api/trades`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
       if (!response.ok) {
         console.warn('Backend unavailable, falling back to local storage');
         return this.loadFromLocal();

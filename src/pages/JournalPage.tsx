@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useState, useEffect } from 'react';
 import CSVManager from '@/csvManager';
 import { CSVTradeData } from '@/csvManager';
+import { useSyncSocket } from '@/hooks/useSyncSocket';
 
 export default function JournalPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,6 +18,11 @@ export default function JournalPage() {
   const [editingTrade, setEditingTrade] = useState<CSVTradeData | null>(null);
   const [trades, setTrades] = useState<CSVTradeData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Enable real-time sync
+  useSyncSocket(() => {
+    loadTrades();
+  });
 
   // Load trades from CSV data on mount and listen for updates
   useEffect(() => {

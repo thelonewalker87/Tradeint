@@ -9,16 +9,29 @@
 # in ai_router.py without going through this file.
 
 import os
-from openai import OpenAI
 import json
+from openai import OpenAI
+from pathlib import Path
+from dotenv import load_dotenv
 from models import TradeInput, TradeMetrics, GradeResult, DimensionScore
 from metrics import calculate_metrics, detect_patterns
+
+# Robust env loading
+dotenv_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=dotenv_path)
+
+api_key = os.environ.get("OPENROUTER_API_KEY")
+if not api_key:
+    api_key = os.environ.get("OPENAI_API_KEY")
+
+if not api_key:
+    api_key = "MISSING_KEY"
 
 MODEL = "openrouter/free"
 
 client = OpenAI(                                   
     base_url = "https://openrouter.ai/api/v1",
-    api_key  = os.environ.get("OPENROUTER_API_KEY"),
+    api_key  = api_key,
 )
 
 SYSTEM_PROMPT = """

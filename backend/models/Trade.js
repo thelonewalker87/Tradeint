@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const tradeSchema = new mongoose.Schema({
+  user: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true 
+  },
   date: { type: String, required: true },
   pair: { type: String, required: true },
   direction: { type: String, required: true },

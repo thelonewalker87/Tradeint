@@ -15,6 +15,7 @@ import JournalPage from "@/pages/JournalPage";
 import CSVUploadPage from "@/pages/CSVUploadPage";
 import NewsPage from "@/pages/NewsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import LinkMT5Page from "@/pages/LinkMT5Page";
 import NotFound from "@/pages/NotFound";
 import { Analytics } from "@vercel/analytics/react";
 
@@ -51,6 +52,7 @@ const App = () => (
               <Route path="/csv-upload" element={<ProtectedRoute><CSVUploadPage /></ProtectedRoute>} />
               <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+              <Route path="/link-mt5" element={<ProtectedRoute><LinkMT5Page /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  user: { email: string; name: string } | null;
+  user: { id: string; email: string; name: string } | null;
   login: (email: string, password: string) => void;
   signup: (email: string, password: string, name: string) => void;
   logout: () => void;
@@ -11,7 +11,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<{ email: string; name: string } | null>(() => {
+  const [user, setUser] = useState<{ id: string; email: string; name: string } | null>(() => {
     const stored = localStorage.getItem('tradient_user');
     if (stored) {
       return JSON.parse(stored);
@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(data.user);
     } catch (error) {
       console.warn('Login API failed, falling back to local demo login:', error);
-      const demoUser = { email, name: email.split('@')[0] || 'Demo User' };
+      const demoUser = { id: 'demo-123', email, name: email.split('@')[0] || 'Demo User' };
       localStorage.setItem('tradient_auth_token', 'demo-token');
       localStorage.setItem('tradient_user', JSON.stringify(demoUser));
       setUser(demoUser);
@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signup = useCallback(async (email: string, password: string, name: string) => {
     // For now, fallback to demo login logic or use same endpoint
     await login(email, password); 
-    const u = { email, name };
+    const u = { id: 'demo-123', email, name };
     localStorage.setItem('tradient_user', JSON.stringify(u));
     setUser(u);
   }, [login]);
