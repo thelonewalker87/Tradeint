@@ -167,55 +167,34 @@ export default function DashboardPage() {
       const aiApiUrl = import.meta.env.VITE_AI_API_URL;
 
       if (aiApiUrl) {
-        // Step 1 — grade only last 10 trades (not 20, reduces time significantly)
-        const aiInputs = currentTrades
-          .slice(-10)
-          .map(t => AIApiService.mapCSVToAITrade(t));
+        // Build a compact trade summary — ONE single API call, no individual grading
+        const tradeSummary = currentTrades.slice(-20).map(t => ({
+          ticker:    t.pair,
+          direction: t.direction,
+          pnl:       t.result,
+          rr:        t.rr,
+          violation: t.ruleViolation || null,
+          notes:     t.notes || null,
+        }));
 
-        const gradedTrades: GradeResult[] = [];
-
-        // Grade trades in parallel not sequentially
-        const gradeResults = await Promise.allSettled(
-          aiInputs.map(input =>
-            fetch(`${aiApiUrl.replace(/\/$/, '')}/ai/query`, {
-              method:  'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body:    JSON.stringify({
-                type:    'grade_trade',
-                payload: { trade: input }
-              })
-            }).then(r => r.ok ? r.json() : null)
-          )
-        );
-
-        gradeResults.forEach(result => {
-          if (result.status === 'fulfilled' && result.value) {
-            gradedTrades.push(result.value);
-          }
+        const response = await fetch(`${aiApiUrl.replace(/\/$/, '')}/ai/query`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            type:    'analyse_performance',
+            payload: {
+              trades:   tradeSummary,
+              question: 'Analyse my trading performance. Identify my biggest weakness, give 3 specific recommendations, and highlight 2 positive patterns.'
+            }
+          })
         });
 
-        if (gradedTrades.length > 0) {
-          // Step 2 — analyse all graded trades
-          // No timeout here — let it complete naturally
-          const response = await fetch(`${aiApiUrl.replace(/\/$/, '')}/ai/query`, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({
-              type:    'analyse_performance',
-              payload: {
-                trades:   gradedTrades,
-                question: 'Summarize my performance, key weakness, and top 3 recommendations.'
-              }
-            })
-          });
-
-          if (response.ok) {
-            const analysis = await response.json();
-            setAiInsights(analysis);
-            toast.success('AI Analysis Complete!');
-            setIsAnalyzing(false);
-            return;
-          }
+        if (response.ok) {
+          const analysis = await response.json();
+          setAiInsights(analysis);
+          toast.success('AI Analysis Complete!');
+          setIsAnalyzing(false);
+          return;
         }
       }
 
@@ -246,14 +225,14 @@ export default function DashboardPage() {
 
     const winningTrades = currentTrades.filter(t => t.result > 0);
     const losingTrades = currentTrades.filter(t => t.result <= 0);
-    
+
     const totalProfitLoss = currentTrades.reduce((sum, t) => sum + t.result, 0);
     const totalWins = winningTrades.reduce((sum, t) => sum + t.result, 0);
     const totalLosses = Math.abs(losingTrades.reduce((sum, t) => sum + t.result, 0));
-    
+
     const averageWin = winningTrades.length > 0 ? totalWins / winningTrades.length : 0;
     const averageLoss = losingTrades.length > 0 ? totalLosses / losingTrades.length : 0;
-    
+
     const winRate = (winningTrades.length / currentTrades.length) * 100;
     const expectancy = (winRate * averageWin - (100 - winRate) * averageLoss) / 100;
     const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? Infinity : 0;
@@ -343,7 +322,7 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-             <Badge variant="outline" className="px-4 py-2 text-xs font-bold border-primary/20 bg-primary/5">
+            <Badge variant="outline" className="px-4 py-2 text-xs font-bold border-primary/20 bg-primary/5">
               {currentTrades.length > 0 ? 'LIVE DATA' : 'NO DATA'}
             </Badge>
           </div>

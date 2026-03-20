@@ -44,17 +44,29 @@ def handle_analyse_performance(payload: dict) -> dict:
     trades   = payload["trades"]
     question = payload.get("question", "What is my biggest weakness?")
 
-    summary = [
-        {
-            "ticker":    t["trade"]["ticker"] if "trade" in t else t.get("ticker", "?"),
-            "grade":     t["letter_grade"],
-            "score":     t["overall_score"],
-            "patterns":  t["patterns"],
-            "pnl":       t["metrics"]["pnl"],
-            "actual_rr": t["metrics"]["actual_rr"],
-        }
-        for t in trades
-    ]
+    # Handle both raw CSV trades and graded GradeResult trades
+    summary = []
+    for t in trades:
+        if "letter_grade" in t:
+            # Graded trade shape — comes from grade_trade results
+            summary.append({
+                "ticker":    t.get("ticker", t.get("trade", {}).get("ticker", "?")),
+                "grade":     t["letter_grade"],
+                "score":     t["overall_score"],
+                "patterns":  t["patterns"],
+                "pnl":       t["metrics"]["pnl"],
+                "actual_rr": t["metrics"]["actual_rr"],
+            })
+        else:
+            # Raw CSV trade shape — comes directly from frontend
+            summary.append({
+                "ticker":    t.get("ticker", "?"),
+                "direction": t.get("direction", "?"),
+                "pnl":       t.get("pnl", 0),
+                "rr":        t.get("rr", 0),
+                "violation": t.get("violation"),
+                "notes":     t.get("notes"),
+            })
 
     response = client.chat.completions.create(
         model    = MODEL,
@@ -66,7 +78,7 @@ def handle_analyse_performance(payload: dict) -> dict:
             {
                 "role": "user",
                 "content": f"""
-Here are {len(summary)} graded trades:
+Here are {len(summary)} trades:
 {json.dumps(summary, indent=2)}
 
 Question: {question}
