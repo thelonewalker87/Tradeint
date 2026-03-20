@@ -22,6 +22,7 @@ export default function LinkMT5Page() {
   const [loading, setLoading] = useState(true);
   const [copiedToken, setCopiedToken] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<{ url: string; error: string }>({ url: '', error: '' });
 
   useEffect(() => {
     const fetchToken = async () => {
@@ -45,7 +46,11 @@ export default function LinkMT5Page() {
         
         const isDemo = localStorage.getItem('tradient_auth_token') === 'demo-token';
         if (isDemo) {
-          setLoading(false); // Stop loading to show the warning UI
+          setDebugInfo({ 
+            url: apiUrl, 
+            error: 'Authentication failed: Falling back to Offline Demo Mode because the backend was unreachable during login.' 
+          });
+          setLoading(false);
           return;
         }
 
@@ -100,6 +105,17 @@ export default function LinkMT5Page() {
             <p className="text-sm text-muted-foreground">
               To enable this on your deployed site, you must set the <code className="bg-muted px-1 rounded text-orange-600">VITE_API_URL</code> environment variable to point to your backend server.
             </p>
+            
+            <div className="bg-muted/50 p-3 rounded-lg text-left space-y-2 border border-border/50">
+               <p className="text-[10px] font-bold text-muted-foreground uppercase">Runtime Diagnostics</p>
+               <div className="text-[11px] font-mono break-all">
+                  <span className="text-muted-foreground font-bold">API_URL:</span> {debugInfo.url || 'http://localhost:5000 (DEFAULT)'}
+               </div>
+               <div className="text-[11px] font-mono text-red-500/80 leading-tight">
+                  <span className="text-muted-foreground font-bold">LATEST_ERROR:</span> {debugInfo.error}
+               </div>
+            </div>
+
             <Button variant="outline" className="w-full" onClick={() => window.location.href = '/dashboard'}>
               Back to Dashboard
             </Button>
