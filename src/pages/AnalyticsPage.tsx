@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import CSVManager from '@/csvManager';
 import { CSVTradeData } from '@/csvManager';
+import { AIApiService } from '@/services/AIApiService';
+import { calculateDisciplineScore, getDisciplineLevel } from '@/lib/scoring';
 
 interface DailyPerformance {
   date: string;
@@ -285,20 +287,48 @@ export default function AnalyticsPage() {
   }, [trades]);
 
   // Discipline score trend
-  const disciplineTrend = useMemo(() => {
-    const data = [];
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+  const { disciplineTrend, currentDisciplineScore, disciplineLevel } = useMemo(() => {
+    if (trades.length === 0) {
+      return { 
+        disciplineTrend: [], 
+        currentDisciplineScore: 0,
+        disciplineLevel: { level: 'No Data', color: 'bg-muted text-muted-foreground', description: '' }
+      };
+    }
+
+    const mappedTrades = trades.map(t => AIApiService.mapCSVToTradeObject(t));
+    const score = calculateDisciplineScore(mappedTrades).overall;
+    const level = getDisciplineLevel(score);
+
+    const sortedTrades = [...mappedTrades].sort((a, b) => a.entryTime.getTime() - b.entryTime.getTime());
     
-    months.forEach((month, index) => {
-      const score = 60 + Math.random() * 30 + (index * 2); // Improving trend
-      data.push({
+    const monthlyData = new Map<string, typeof mappedTrades>();
+    sortedTrades.forEach(t => {
+      const monthKey = t.entryTime.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      if (!monthlyData.has(monthKey)) {
+        monthlyData.set(monthKey, []);
+      }
+      monthlyData.get(monthKey)!.push(t);
+    });
+
+    const trendData: { month: string; score: number }[] = [];
+    let cumulativeTrades: typeof mappedTrades = [];
+
+    // Map maintains insertion order, so this naturally iterates oldest to newest
+    monthlyData.forEach((monthTrades, month) => {
+      cumulativeTrades = [...cumulativeTrades, ...monthTrades];
+      trendData.push({
         month,
-        score: Math.min(100, Math.round(score))
+        score: calculateDisciplineScore(cumulativeTrades).overall
       });
     });
-    
-    return data;
-  }, []);
+
+    return { 
+      disciplineTrend: trendData.slice(-6), // Trend shows at most last 6 months
+      currentDisciplineScore: score,
+      disciplineLevel: level
+    };
+  }, [trades]);
 
   if (isLoading) {
     return (
@@ -503,7 +533,7 @@ export default function AnalyticsPage() {
                         axisLine={false}
                         width={50}
                         tickFormatter={(v) => {
-                          if (Math.abs(v) >= 1000) return `$${(v / 1000).toFixed(1)}k`;
+                          if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(1)}k`;
                           return String(v);
                         }}
                       />
@@ -621,12 +651,14 @@ export default function AnalyticsPage() {
               
               <div className="mt-6 text-center">
                 <div className="text-2xl font-bold">
-                  {disciplineTrend[disciplineTrend.length - 1]?.score || 0}
+                  {currentDisciplineScore}
                 </div>
                 <div className="text-sm text-muted-foreground">Current Discipline Score</div>
-                <Badge className="mt-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white border-0">
-                  Excellent
-                </Badge>
+                {disciplineLevel && disciplineLevel.level !== 'No Data' && (
+                  <Badge className={`mt-2 ${disciplineLevel.color} border-0 bg-secondary/50`}>
+                    {disciplineLevel.level}
+                  </Badge>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -652,7 +684,7 @@ function ImprovedMetricCard({ title, value, color, icon, trend }: ImprovedMetric
       <CardContent className="relative p-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <div className="p-1.5 bg-gradient-to-br from-primary/20 to-primary/30 rounded-md">
+            <div className="p-1.5 bg-gradient-to-br from-primary/20 to-primary/30 rounded-md flex items-center justify-center">
               <div className={`w-4 h-4 ${color}`}>{icon}</div>
             </div>
             <div className={`flex items-center gap-1 text-xs font-medium ${
@@ -695,7 +727,7 @@ function ImprovedQuickStatCard({ title, value, icon, color }: ImprovedQuickStatC
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">{title}</span>
-            <div className={`p-1.5 bg-gradient-to-br ${colorClasses[color]} rounded-md`}>
+            <div className={`p-1.5 bg-gradient-to-br ${colorClasses[color]} rounded-md flex items-center justify-center`}>
               <div className="w-4 h-4 text-white">{icon}</div>
             </div>
           </div>

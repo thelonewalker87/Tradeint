@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, TrendingUp, TrendingDown, Calendar, DollarSign, Target, AlertCircle, Clock, Globe, BarChart3, Shield, Brain, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ interface AddTradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddTrade: (trade: CSVTradeData) => void;
+  initialData?: CSVTradeData | null;
 }
 
 const currencyPairs = [
@@ -77,27 +78,18 @@ const marketConditions = [
   'Trending Up', 'Trending Down', 'Ranging', 'Volatile', 'Low Volume', 'High Volume'
 ];
 
-export default function AddTradeModal({ isOpen, onClose, onAddTrade }: AddTradeModalProps) {
-  const [formData, setFormData] = useState<CSVTradeData & {
-    session: string;
-    setupType: string;
-    emotionalState: string;
-    marketCondition: string;
-    confidence: number;
-    timeHeld: string;
-    commission: number;
-    swap: number;
-  }>({
+export default function AddTradeModal({ isOpen, onClose, onAddTrade, initialData }: AddTradeModalProps) {
+  const defaultFormData = {
     id: '',
     date: new Date().toISOString().split('T')[0],
     pair: '',
-    direction: 'long',
+    direction: 'long' as 'long' | 'short',
     entry: 0,
     exit: 0,
     positionSize: 0,
     result: 0,
     rr: 0,
-    ruleViolation: null,
+    ruleViolation: null as string | null,
     notes: '',
     session: 'london',
     setupType: '',
@@ -107,7 +99,22 @@ export default function AddTradeModal({ isOpen, onClose, onAddTrade }: AddTradeM
     timeHeld: '1-4 hours',
     commission: 0,
     swap: 0
-  });
+  };
+
+  const [formData, setFormData] = useState<CSVTradeData & typeof defaultFormData>(defaultFormData);
+
+  // Update form fields if initialData is provided
+  useEffect(() => {
+    if (isOpen && initialData) {
+      setFormData({
+        ...defaultFormData,
+        ...initialData
+      });
+    } else if (isOpen && !initialData) {
+      setFormData(defaultFormData);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialData]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('basic');
@@ -153,7 +160,7 @@ export default function AddTradeModal({ isOpen, onClose, onAddTrade }: AddTradeM
 
     const tradeData: CSVTradeData = {
       ...formData,
-      id: `TR-${Date.now()}`,
+      id: initialData ? initialData.id : `TR-${Date.now()}`,
       result: calculateResult(),
       rr: calculateRR()
     };
@@ -161,28 +168,7 @@ export default function AddTradeModal({ isOpen, onClose, onAddTrade }: AddTradeM
     onAddTrade(tradeData);
     onClose();
     
-    // Reset form
-    setFormData({
-      id: '',
-      date: new Date().toISOString().split('T')[0],
-      pair: '',
-      direction: 'long',
-      entry: 0,
-      exit: 0,
-      positionSize: 0,
-      result: 0,
-      rr: 0,
-      ruleViolation: null,
-      notes: '',
-      session: 'london',
-      setupType: '',
-      emotionalState: 'Calm',
-      marketCondition: 'Ranging',
-      confidence: 70,
-      timeHeld: '1-4 hours',
-      commission: 0,
-      swap: 0
-    });
+    // Form is effectively reset in useEffect
   };
 
   const updateField = (field: string, value: string | number | null) => {
@@ -202,7 +188,7 @@ export default function AddTradeModal({ isOpen, onClose, onAddTrade }: AddTradeM
         <DialogHeader className="px-4 sm:px-6 pt-6">
           <DialogTitle className="flex items-center gap-2 text-xl text-responsive-lg">
             <Target className="w-6 h-6 text-primary" />
-            Add New Trade
+            {initialData ? 'Edit Trade' : 'Add New Trade'}
             <Badge variant="secondary" className="ml-2">Advanced</Badge>
           </DialogTitle>
         </DialogHeader>
@@ -649,7 +635,7 @@ export default function AddTradeModal({ isOpen, onClose, onAddTrade }: AddTradeM
             </Button>
             <Button type="submit" className="flex-1">
               <Target className="w-4 h-4 mr-2" />
-              Add Trade
+              {initialData ? 'Save Changes' : 'Add Trade'}
             </Button>
           </div>
         </form>

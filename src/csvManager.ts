@@ -146,6 +146,15 @@ class CSVManager {
     await this.saveToAPI(updatedTrades);
   }
 
+  static async updateTradeInAPI(updatedTrade: CSVTradeData): Promise<void> {
+    const existingTrades = await this.loadFromAPI();
+    const index = existingTrades.findIndex(t => t.id === updatedTrade.id);
+    if (index >= 0) {
+      existingTrades[index] = updatedTrade;
+      await this.saveToAPI(existingTrades);
+    }
+  }
+
   static convertTradeToCSV(trade: Record<string, unknown>): CSVTradeData {
     return {
       id: (trade.id as string) || `TR-${Date.now()}`,

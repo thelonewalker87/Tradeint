@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ChevronLeft, ChevronRight, Play, AlertTriangle } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Play, AlertTriangle, Edit2 } from 'lucide-react';
 import { CSVTradeData } from '@/csvManager';
 import TradeReplayModal from './TradeReplayModal';
 
@@ -9,9 +9,10 @@ const PAGE_SIZE = 5;
 interface TradeJournalTableProps {
   trades: CSVTradeData[];
   isLoading?: boolean;
+  onEditTrade?: (trade: CSVTradeData) => void;
 }
 
-export default function TradeJournalTable({ trades, isLoading = false }: TradeJournalTableProps) {
+export default function TradeJournalTable({ trades, isLoading = false, onEditTrade }: TradeJournalTableProps) {
   const [search, setSearch] = useState('');
   const [filterOutcome, setFilterOutcome] = useState<'all' | 'win' | 'loss'>('all');
   const [page, setPage] = useState(1);
@@ -139,9 +140,16 @@ export default function TradeJournalTable({ trades, isLoading = false }: TradeJo
                       )}
                     </td>
                     <td className="p-3">
-                      <button onClick={() => setReplayTrade(t)} className="p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors" title="Replay Trade">
-                        <Play className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setReplayTrade(t)} className="p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors" title="Replay Trade">
+                          <Play className="w-3.5 h-3.5" />
+                        </button>
+                        {onEditTrade && (
+                          <button onClick={() => onEditTrade(t)} className="p-1.5 rounded-lg hover:bg-primary/10 text-primary transition-colors" title="Edit Trade">
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </motion.tr>
                 ))}

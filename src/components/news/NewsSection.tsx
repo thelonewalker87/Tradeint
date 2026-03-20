@@ -190,73 +190,82 @@ export default function NewsSection() {
             {/* News List */}
             <div className="space-y-3">
               <AnimatePresence>
-                {filteredNews.map((news, index) => (
+                {filteredNews.length === 0 ? (
                   <motion.div
-                    key={news.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="p-4 rounded-lg border bg-background/50 backdrop-blur-sm transition-all"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="p-8 text-center text-muted-foreground border rounded-lg bg-background/50 backdrop-blur-sm"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 space-y-2">
-                        {/* Header */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge className={categoryColors[news.category]}>
-                            {news.category}
-                          </Badge>
-                          <div className={`flex items-center gap-1 text-sm font-medium ${sentimentColors[news.sentiment]}`}>
-                            {news.sentiment === 'bullish' && <TrendingUp className="h-3 w-3" />}
-                            {news.sentiment === 'bearish' && <TrendingDown className="h-3 w-3" />}
-                            <span className="capitalize">{news.sentiment}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className={`w-2 h-2 rounded-full ${impactColors[news.impact]}`} />
-                            <span className="text-xs text-muted-foreground capitalize">{news.impact}</span>
-                          </div>
-                        </div>
-
-                        {/* Title */}
-                        <h4 className="font-semibold text-foreground leading-tight">
-                          {news.title}
-                        </h4>
-
-                        {/* Summary */}
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {news.summary}
-                        </p>
-
-                        {/* Footer */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Globe className="h-3 w-3" />
-                              {news.source}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {formatTimeAgo(news.publishedAt)}
-                            </span>
-                          </div>
-
-                          {/* Redirection disabled as per user request */}
-                        </div>
-
-                        {/* Symbols */}
-                        {news.symbols && news.symbols.length > 0 && (
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {news.symbols.map(symbol => (
-                              <Badge key={symbol} variant="outline" className="text-xs">
-                                {symbol}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    No news found for the selected filters. Try adjusting your criteria.
                   </motion.div>
-                ))}
+                ) : (
+                  filteredNews.map((news, index) => (
+                    <motion.div
+                      key={news.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="p-4 rounded-lg border bg-background/50 backdrop-blur-sm transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 space-y-2">
+                          {/* Header */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className={categoryColors[news.category as keyof typeof categoryColors] || ''}>
+                              {news.category}
+                            </Badge>
+                            <div className={`flex items-center gap-1 text-sm font-medium ${sentimentColors[news.sentiment as keyof typeof sentimentColors] || sentimentColors.neutral}`}>
+                              {news.sentiment === 'bullish' && <TrendingUp className="h-3 w-3" />}
+                              {news.sentiment === 'bearish' && <TrendingDown className="h-3 w-3" />}
+                              <span className="capitalize">{news.sentiment}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className={`w-2 h-2 rounded-full ${impactColors[news.impact as keyof typeof impactColors] || impactColors.low}`} />
+                              <span className="text-xs text-muted-foreground capitalize">{news.impact}</span>
+                            </div>
+                          </div>
+  
+                          {/* Title */}
+                          <h4 className="font-semibold text-foreground leading-tight">
+                            {news.title}
+                          </h4>
+  
+                          {/* Summary */}
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {news.summary}
+                          </p>
+  
+                          {/* Footer */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Globe className="h-3 w-3" />
+                                {news.source}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {formatTimeAgo(news.publishedAt)}
+                              </span>
+                            </div>
+                          </div>
+  
+                          {/* Symbols */}
+                          {news.symbols && news.symbols.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {news.symbols.map(symbol => (
+                                <Badge key={symbol} variant="outline" className="text-xs">
+                                  {symbol}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
               </AnimatePresence>
             </div>
           </TabsContent>

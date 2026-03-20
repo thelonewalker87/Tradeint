@@ -14,6 +14,7 @@ import { CSVTradeData } from '@/csvManager';
 export default function JournalPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddTradeModalOpen, setIsAddTradeModalOpen] = useState(false);
+  const [editingTrade, setEditingTrade] = useState<CSVTradeData | null>(null);
   const [trades, setTrades] = useState<CSVTradeData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -61,16 +62,29 @@ export default function JournalPage() {
     }
   };
 
-  const handleAddTrade = async (newTrade: CSVTradeData) => {
+  const handleAddOrEditTrade = async (submittedTrade: CSVTradeData) => {
     try {
-      // Add to API storage
-      await CSVManager.addTradeToAPI(newTrade);
+      if (editingTrade) {
+        await CSVManager.updateTradeInAPI(submittedTrade);
+      } else {
+        await CSVManager.addTradeToAPI(submittedTrade);
+      }
       
       // Reload trades to update display
       loadTrades();
     } catch (error) {
-      console.error('Error adding trade:', error);
+      console.error('Error saving trade:', error);
     }
+  };
+
+  const handleEditClick = (trade: CSVTradeData) => {
+    setEditingTrade(trade);
+    setIsAddTradeModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsAddTradeModalOpen(false);
+    setTimeout(() => setEditingTrade(null), 300); // clear after close animation
   };
 
   const handleRefreshData = async () => {
@@ -276,15 +290,16 @@ export default function JournalPage() {
             </CardContent>
           </Card>
         ) : (
-          <TradeJournalTable trades={filteredTrades} isLoading={isLoading} />
+          <TradeJournalTable trades={filteredTrades} isLoading={isLoading} onEditTrade={handleEditClick} />
         )}
       </motion.div>
 
-      {/* Add Trade Modal */}
+      {/* Add/Edit Trade Modal */}
       <AddTradeModal
         isOpen={isAddTradeModalOpen}
-        onClose={() => setIsAddTradeModalOpen(false)}
-        onAddTrade={handleAddTrade}
+        onClose={handleCloseModal}
+        onAddTrade={handleAddOrEditTrade}
+        initialData={editingTrade}
       />
     </div>
   );
