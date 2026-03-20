@@ -26,9 +26,9 @@ export default function LinkMT5Page() {
 
   useEffect(() => {
     const fetchToken = async () => {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       try {
         const authToken = localStorage.getItem('tradient_auth_token');
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const response = await fetch(`${apiUrl}/api/mt5/token`, {
           headers: {
             'Authorization': `Bearer ${authToken}`
