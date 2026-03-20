@@ -16,6 +16,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
+export default function LinkMT5Page() {
+  const [token, setToken] = useState<string>('');
+  const [webhookUrl, setWebhookUrl] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [copiedToken, setCopiedToken] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const [debugInfo, setDebugInfo] = useState<{ url: string; error: string }>({ url: '', error: '' });
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -219,7 +225,7 @@ import { toast } from 'sonner';
                       variant="secondary" 
                       size="sm" 
                       className="mt-2 rounded-lg gap-2 bg-primary/10 hover:bg-primary/20 text-primary border-none"
-                      onClick={() => window.open(`${apiUrl}/api/mt5/download`, '_blank')}
+                      onClick={() => window.location.href = `${apiUrl}/api/mt5/download`}
                     >
                       <Download className="w-3.5 h-3.5" />
                       Download EA Script
