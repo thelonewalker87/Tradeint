@@ -160,81 +160,79 @@ export default function DashboardPage() {
   }, []);
 
   const handleDeepAIAnalysis = async () => {
-  if (currentTrades.length === 0) return;
-  setIsAnalyzing(true);
+    if (currentTrades.length === 0) return;
+    setIsAnalyzing(true);
 
-  try {
-    const aiApiUrl = import.meta.env.VITE_AI_API_URL;
+    try {
+      const aiApiUrl = import.meta.env.VITE_AI_API_URL;
 
-    if (aiApiUrl) {
-      // Step 1 — grade only last 10 trades (not 20, reduces time significantly)
-      const aiInputs = currentTrades
-        .slice(-10)
-        .map(t => AIApiService.mapCSVToAITrade(t));
+      if (aiApiUrl) {
+        // Step 1 — grade only last 10 trades (not 20, reduces time significantly)
+        const aiInputs = currentTrades
+          .slice(-10)
+          .map(t => AIApiService.mapCSVToAITrade(t));
 
-      const gradedTrades: GradeResult[] = [];
+        const gradedTrades: GradeResult[] = [];
 
-      // Grade trades in parallel not sequentially
-      const gradeResults = await Promise.allSettled(
-        aiInputs.map(input =>
-          fetch(`${aiApiUrl.replace(/\/$/, '')}/ai/query`, {
+        // Grade trades in parallel not sequentially
+        const gradeResults = await Promise.allSettled(
+          aiInputs.map(input =>
+            fetch(`${aiApiUrl.replace(/\/$/, '')}/ai/query`, {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body:    JSON.stringify({
+                type:    'grade_trade',
+                payload: { trade: input }
+              })
+            }).then(r => r.ok ? r.json() : null)
+          )
+        );
+
+        gradeResults.forEach(result => {
+          if (result.status === 'fulfilled' && result.value) {
+            gradedTrades.push(result.value);
+          }
+        });
+
+        if (gradedTrades.length > 0) {
+          // Step 2 — analyse all graded trades
+          // No timeout here — let it complete naturally
+          const response = await fetch(`${aiApiUrl.replace(/\/$/, '')}/ai/query`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({
-              type:    'grade_trade',
-              payload: { trade: input }
+              type:    'analyse_performance',
+              payload: {
+                trades:   gradedTrades,
+                question: 'Summarize my performance, key weakness, and top 3 recommendations.'
+              }
             })
-          }).then(r => r.ok ? r.json() : null)
-        )
-      );
+          });
 
-      gradeResults.forEach(result => {
-        if (result.status === 'fulfilled' && result.value) {
-          gradedTrades.push(result.value);
-        }
-      });
-
-      if (gradedTrades.length > 0) {
-        // Step 2 — analyse all graded trades
-        // No timeout here — let it complete naturally
-        const response = await fetch(`${aiApiUrl.replace(/\/$/, '')}/ai/query`, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            type:    'analyse_performance',
-            payload: {
-              trades:   gradedTrades,
-              question: 'Summarize my performance, key weakness, and top 3 recommendations.'
-            }
-          })
-        });
-
-        if (response.ok) {
-          const analysis = await response.json();
-          setAiInsights(analysis);
-          toast.success('AI Analysis Complete!');
-          setIsAnalyzing(false);
-          return;
+          if (response.ok) {
+            const analysis = await response.json();
+            setAiInsights(analysis);
+            toast.success('AI Analysis Complete!');
+            setIsAnalyzing(false);
+            return;
+          }
         }
       }
+
+      // Fallback to local only if AI truly failed
+      const localAnalysis = buildLocalAnalysis(currentTrades);
+      setAiInsights(localAnalysis);
+      toast.success('Analysis Complete (local)');
+
+    } catch (error) {
+      console.error('Analysis error:', error);
+      const localAnalysis = buildLocalAnalysis(currentTrades);
+      setAiInsights(localAnalysis);
+      toast.success('Analysis Complete (local)');
+    } finally {
+      setIsAnalyzing(false);
     }
-
-    // Fallback to local only if AI truly failed
-    const localAnalysis = buildLocalAnalysis(currentTrades);
-    setAiInsights(localAnalysis);
-    toast.success('Analysis Complete (local)');
-
-  } catch (error) {
-    console.error('Analysis error:', error);
-    const localAnalysis = buildLocalAnalysis(currentTrades);
-    setAiInsights(localAnalysis);
-    toast.success('Analysis Complete (local)');
-  } finally {
-    setIsAnalyzing(false);
-  }
-};
-
-
+  };
 
   // Memoize metrics so they don't recalculate on every render
   const metrics = useMemo(() => {
