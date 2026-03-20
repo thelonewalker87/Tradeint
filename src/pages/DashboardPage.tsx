@@ -8,7 +8,6 @@ import PerformanceCards from '@/components/PerformanceCards';
 import PerformanceCharts from '@/components/PerformanceCharts';
 import BehavioralInsights from '@/components/BehavioralInsights';
 import NewsSection from '@/components/news/NewsSection';
-import TradeJournalTable from '@/components/TradeJournalTable';
 import DisciplineScoreWidget from '@/components/DisciplineScoreWidget';
 import EnhancedCSVUpload from '@/components/upload/EnhancedCSVUpload';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -406,11 +405,6 @@ export default function DashboardPage() {
               />
             </motion.div>
           </div>
-
-
-          <motion.div variants={itemVariants}>
-            <TradeJournalTable trades={currentTrades} />
-          </motion.div>
 
           <NewsSection />
         </>
