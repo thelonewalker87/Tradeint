@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
+const { v4: uuidv4 } = require('uuid');
 
 /**
  * @route   GET /api/mt5/token
@@ -13,6 +14,11 @@ router.get('/token', auth, async (req, res) => {
     const user = await User.findById(req.user.userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (!user.mt5_webhook_token) {
+      user.mt5_webhook_token = uuidv4();
+      await user.save();
     }
 
     const host = req.get('host');
