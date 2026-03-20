@@ -86,10 +86,14 @@ void SyncDeal(ulong ticket)
       }
    }
 
-   // Prepare JSON
+   // Prepare JSON with safe double-to-string conversion
    string json = StringFormat(
-      "{\"token\":\"%s\",\"trade\":{\"date\":\"%s\",\"pair\":\"%s\",\"direction\":\"%s\",\"entry\":%f,\"exit\":%f,\"positionSize\":%f,\"result\":%f,\"rr\":0,\"notes\":\"Synced via MT5 EA\"}}",
-      InpToken, date_str, symbol, direction, entry_price, exit_price, volume, profit
+      "{\"token\":\"%s\",\"trade\":{\"date\":\"%s\",\"pair\":\"%s\",\"direction\":\"%s\",\"entry\":%s,\"exit\":%s,\"positionSize\":%s,\"result\":%s,\"rr\":0,\"notes\":\"Synced via MT5 EA\"}}",
+      InpToken, date_str, symbol, direction, 
+      DoubleToString(entry_price, _Digits), 
+      DoubleToString(exit_price, _Digits), 
+      DoubleToString(volume, 2), 
+      DoubleToString(profit, 2)
    );
 
    SendWebhook(json);
